@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, Timestamp, getDocs, orderBy, addDoc, writeBatch, setDoc, deleteDoc, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, Timestamp, getDocs, orderBy, addDoc, writeBatch, deleteDoc, limit } from 'firebase/firestore';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import toast from 'react-hot-toast';
-import { format, addMinutes, isSameDay, startOfDay } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
   HomeIcon, 
@@ -72,7 +72,7 @@ interface Task {
   type: 'resident' | 'general';
   name: string;
   description: string;
-  dueDate: Date | { toDate: () => Date } | any; // Modifier pour accepter Timestamp ou Date
+  dueDate: Date | { toDate: () => Date };
   status: 'pending' | 'completed';
   residentId?: string;
   residentName?: string;
@@ -160,21 +160,13 @@ interface Message {
     name: string;
     isEmployer: boolean;
   };
+  title: string; // Ajout du champ titre
   content: string;
   createdAt: {
     toDate: () => Date;
   };
   centerCode: string;
   isPinned?: boolean;
-}
-
-interface CreateReportModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  centerCode: string;
-  currentUserId: string;
-  currentUserName: string;
-  onReportCreated: (reportId: string) => void;
 }
 
 // Move these component definitions before they are used
@@ -209,7 +201,7 @@ const renderEmployeeView = (
       } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
         taskDueDate = task.dueDate.toDate();
       } else {
-        taskDueDate = new Date(task.dueDate);
+        taskDueDate = new Date(task.dueDate as unknown as string | number);
       }
       
       // Normaliser la date de la tâche à minuit pour comparer avec hier
@@ -236,7 +228,7 @@ const renderEmployeeView = (
       } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
         taskDueDate = task.dueDate.toDate();
       } else {
-        taskDueDate = new Date(task.dueDate);
+        taskDueDate = new Date(task.dueDate as unknown as string | number);
       }
       
       // Normaliser la date de la tâche à minuit pour comparer avec aujourd'hui
@@ -264,7 +256,7 @@ const renderEmployeeView = (
       } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
         taskDueDate = task.dueDate.toDate();
       } else {
-        taskDueDate = new Date(task.dueDate);
+        taskDueDate = new Date(task.dueDate as unknown as string | number);
       }
       
       // Normaliser la date de la tâche à minuit pour comparer avec aujourd'hui
@@ -281,7 +273,7 @@ const renderEmployeeView = (
     });
     
     // Combiner toutes les tâches avec la priorité souhaitée
-    let nextTasks = [...yesterdayTasks, ...overdueTasks, ...todayTasks];
+    const nextTasks = [...yesterdayTasks, ...overdueTasks, ...todayTasks];
     
     // Limiter à 10 tâches maximum (au lieu de 5)
     return nextTasks.slice(0, 10);
@@ -345,7 +337,7 @@ const renderEmployeeView = (
               } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
                 taskDueDate = task.dueDate.toDate();
               } else {
-                taskDueDate = new Date(task.dueDate);
+                taskDueDate = new Date(task.dueDate as unknown as string | number);
               }
               
               // Normaliser la date de la tâche pour comparer avec hier/aujourd'hui
@@ -425,7 +417,7 @@ const renderEmployeeView = (
 
 const renderEmployerView = (
   onlineUsers: OnlineUser[],
-  router: any
+  router: ReturnType<typeof useRouter>
 ) => (
   <>
     {/* Section Liste des employés */}
@@ -562,7 +554,6 @@ export default function DashboardPage() {
     language: 'fr' as 'fr' | 'en'
   });
   const [isPreferencesModified, setIsPreferencesModified] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isConfirmCompleteModalOpen, setIsConfirmCompleteModalOpen] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<string | null>(null);
   
@@ -572,6 +563,7 @@ export default function DashboardPage() {
 
   // États pour la gestion des messages
   const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessageTitle, setNewMessageTitle] = useState('');
   const [newMessageContent, setNewMessageContent] = useState('');
   const [isSubmittingMessage, setIsSubmittingMessage] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
@@ -591,7 +583,7 @@ export default function DashboardPage() {
   // Ajouter du code dans le useEffect qui détecte les paramètres d'URL pour également détecter le filtre
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['accueil', 'taches', 'residents', 'rapports', 'alertes'].includes(tabParam)) {
+    if (tabParam && ['accueil', 'taches', 'residents', 'rapports', 'messages', 'alertes'].includes(tabParam)) {
       setActiveTab(tabParam as Tab);
       
       // Si l'onglet est 'taches', vérifier s'il y a un paramètre de filtre
@@ -636,6 +628,7 @@ export default function DashboardPage() {
         console.error('Error fetching user info:', error);
         toast.error('Erreur lors du chargement des données utilisateur');
       } finally {
+        // Fin du chargement initial
         setLoading(false);
       }
     }
@@ -892,7 +885,7 @@ export default function DashboardPage() {
             // Pour les tâches virtuelles dont le parent n'existe plus, on va les marquer comme "skipped"
             // dans le stockage local pour ne plus les afficher
             
-            let skippedVirtualTasks = JSON.parse(localStorage.getItem('skippedVirtualTasks') || '[]');
+            const skippedVirtualTasks = JSON.parse(localStorage.getItem('skippedVirtualTasks') || '[]');
             if (!skippedVirtualTasks.includes(taskId)) {
               skippedVirtualTasks.push(taskId);
               localStorage.setItem('skippedVirtualTasks', JSON.stringify(skippedVirtualTasks));
@@ -985,7 +978,7 @@ export default function DashboardPage() {
           const currentDate = taskData.dueDate instanceof Date 
             ? taskData.dueDate 
             : (taskData.dueDate as any).toDate();
-          let nextDate = new Date(currentDate);
+          const nextDate = new Date(currentDate);
 
           // Calculer la prochaine date selon le type de récurrence
           switch (taskData.recurrenceType) {
@@ -1025,12 +1018,13 @@ export default function DashboardPage() {
           }
 
           // Créer la nouvelle tâche récurrente
-          const { id, completedBy, status, ...taskDataWithoutStatus } = taskData;
+          // Utiliser _ préfixe pour ignorer les variables non utilisées
+          const { id: _id, completedBy: _completedBy, status: _status, ...taskDataWithoutStatus } = taskData;
           const newTaskData = {
             ...taskDataWithoutStatus,
             dueDate: Timestamp.fromDate(nextDate),
             status: 'pending' as const,
-            completedBy: null,
+            // completedBy est déjà géré par la déstructuration ou est null
             createdAt: serverTimestamp(),
             deleted: false // Explicitement marquer comme non supprimée
           };
@@ -1178,7 +1172,7 @@ export default function DashboardPage() {
       }
       
       // Calculer si cette tâche récurrente doit apparaître à la date cible
-      let currentDate = new Date(baseDateOnly);
+      const currentDate = new Date(baseDateOnly);
       let nextOccurrence = false;
       
       while (currentDate.getTime() <= targetTimestamp) {
@@ -1339,7 +1333,6 @@ export default function DashboardPage() {
         const taskDate = new Date(task.dueDate);
         taskDate.setHours(0, 0, 0, 0);
         const isToday = taskDate.getTime() === today.getTime();
-        const isFuture = taskDate.getTime() > today.getTime();
         const isPast = taskDate.getTime() < today.getTime();
         
         // Vérifier si cette date est ignorée pour cette tâche
@@ -1431,7 +1424,7 @@ export default function DashboardPage() {
         }
       })
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [tasks, taskFilter, searchQuery, selectedDate, JSON.stringify(tasks.map(t => t.skippedDates?.length || 0))]);
+  }, [tasks, taskFilter, searchQuery, selectedDate, JSON.stringify(tasks.map(t => t.skippedDates?.length || 0)), generateFutureOccurrences]); // Ajout de generateFutureOccurrences
 
   const renderTasksContent = () => {
     // Calculer l'index de début et de fin pour la pagination
@@ -1731,7 +1724,7 @@ export default function DashboardPage() {
                   } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
                     taskDueDate = task.dueDate.toDate();
                   } else {
-                    taskDueDate = new Date(task.dueDate);
+                    taskDueDate = new Date(task.dueDate as unknown as string | number);
                   }
                   
                   const isOverdue = taskDueDate < now && task.status !== 'completed';
@@ -1973,7 +1966,7 @@ export default function DashboardPage() {
   ];
 
   // Charger les résidents
-  const loadResidents = async () => {
+  const loadResidents = useCallback(async () => {
     if (!customUser?.centerCode) return;
     
     try {
@@ -1996,20 +1989,20 @@ export default function DashboardPage() {
     } finally {
       setIsLoadingResidents(false);
     }
-  };
+  }, [customUser?.centerCode]); // Dépendances pour useCallback
 
   useEffect(() => {
     if (activeTab === 'residents') {
       loadResidents();
     }
-  }, [activeTab, customUser?.centerCode]);
+  }, [activeTab, customUser?.centerCode, loadResidents]); // Ajout de loadResidents
 
   // Charger les résidents pour l'affichage sur la page d'accueil
   useEffect(() => {
     if (activeTab === 'accueil' && customUser?.centerCode) {
       loadResidents();
     }
-  }, [activeTab, customUser?.centerCode]);
+  }, [activeTab, customUser?.centerCode, loadResidents]); // Ajout de loadResidents
 
   // Filtrer les résidents en fonction de la recherche et du filtre de genre
   const filteredResidents = useMemo(() => {
@@ -2208,7 +2201,7 @@ export default function DashboardPage() {
           ? task.dueDate 
           : 'toDate' in task.dueDate 
             ? (task.dueDate as { toDate: () => Date }).toDate()
-            : new Date(task.dueDate);
+            : new Date(task.dueDate as unknown as string | number);
 
         // Vérifier si la tâche est en retard de plus de 20 minutes
         if (taskDueDate < twentyMinutesAgo) {
@@ -2229,7 +2222,7 @@ export default function DashboardPage() {
               type: 'task_overdue',
               title: 'Tâche en retard',
               message: `La tâche "${task.name}" est en retard de plus de 20 minutes.`,
-              createdAt: serverTimestamp() as any,
+              createdAt: serverTimestamp() as Timestamp,
               readBy: [],
               relatedId: task.id,
               centerCode: customUser.centerCode,
@@ -2252,7 +2245,7 @@ export default function DashboardPage() {
       const interval = setInterval(checkOverdueTasks, 60000);
       return () => clearInterval(interval);
     }
-  }, [customUser?.centerCode]);
+  }, [customUser?.centerCode, checkOverdueTasks]); // Ajout de checkOverdueTasks
 
   // Charger les préférences utilisateur
   useEffect(() => {
@@ -2416,7 +2409,7 @@ export default function DashboardPage() {
                 className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Rapports d'activité</h3>
+                  <h3 className="text-lg font-semibold">Rapports d&apos;activité</h3>
                   <DocumentTextIcon className="h-8 w-8 opacity-75" />
                 </div>
                 <p className="text-3xl font-bold mt-4">
@@ -2427,7 +2420,7 @@ export default function DashboardPage() {
                     return isSameDay(reportDate, new Date());
                   }).length}
                 </p>
-                <p className="text-amber-100 text-sm mt-2">aujourd'hui</p>
+                <p className="text-amber-100 text-sm mt-2">aujourd&apos;hui</p>
               </button>
               <button
                 onClick={() => setActiveTab('alertes')}
@@ -2451,7 +2444,7 @@ export default function DashboardPage() {
                     isSameDay(alert.createdAt.toDate(), new Date())
                   ).length}
                 </p>
-                <p className="text-rose-100 text-sm mt-2">non lues aujourd'hui</p>
+                <p className="text-rose-100 text-sm mt-2">non lues aujourd&apos;hui</p>
               </button>
             </div>
             
@@ -2626,7 +2619,7 @@ export default function DashboardPage() {
                           !alert.readBy?.includes(customUser?.uid || '') && 
                           isSameDay(alert.createdAt.toDate(), new Date())
                         ).length} alertes</p>
-                        <p className="text-xs text-gray-500">Notifications non lues aujourd'hui</p>
+                        <p className="text-xs text-gray-500">Notifications non lues aujourd&apos;hui</p>
                       </div>
                     </div>
                   </div>
@@ -2975,7 +2968,7 @@ export default function DashboardPage() {
         return (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <h2 className="text-2xl font-bold text-gray-800">Rapports d'activité</h2>
+              <h2 className="text-2xl font-bold text-gray-800">Rapports d&apos;activité</h2>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
                 <DatePicker
                   selected={selectedDate}
@@ -3279,7 +3272,12 @@ export default function DashboardPage() {
                           </button>
                         )}
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-3">
+                        {message.title && (
+                          <h4 className="text-base font-semibold text-gray-900 mb-1">
+                            {message.title}
+                          </h4>
+                        )}
                         <p className="text-gray-700 whitespace-pre-line">{message.content}</p>
                       </div>
                     </div>
@@ -3290,20 +3288,44 @@ export default function DashboardPage() {
 
             {/* Création de nouveau message */}
             {customUser?.isEmployer && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <h3 className="text-lg font-medium text-gray-900 mb-3">Nouveau message</h3>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Nouveau message</h3>
                 <div className="space-y-4">
-                  <textarea
-                    value={newMessageContent}
-                    onChange={(e) => setNewMessageContent(e.target.value)}
-                    placeholder="Écrivez votre message ici..."
-                    rows={4}
-                    className="w-full rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm p-3"
-                  />
-                  <div className="flex justify-end">
+                  {/* Champ pour le titre */}
+                  <div>
+                    <label htmlFor="message-title" className="block text-sm font-medium text-gray-700 mb-1">
+                      Titre du message
+                    </label>
+                    <input
+                      type="text"
+                      id="message-title"
+                      value={newMessageTitle}
+                      onChange={(e) => setNewMessageTitle(e.target.value)}
+                      placeholder="Entrez un titre pour votre message..."
+                      className="w-full rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm px-4 py-2 text-gray-900"
+                    />
+                  </div>
+                  
+                  {/* Champ pour le contenu */}
+                  <div>
+                    <label htmlFor="message-content" className="block text-sm font-medium text-gray-700 mb-1">
+                      Contenu du message
+                    </label>
+                    <textarea
+                      id="message-content"
+                      value={newMessageContent}
+                      onChange={(e) => setNewMessageContent(e.target.value)}
+                      placeholder="Écrivez votre message ici..."
+                      rows={5}
+                      className="w-full rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm px-4 py-3 text-gray-900"
+                    />
+                  </div>
+                  
+                  <div className="flex justify-end pt-2">
                     <button
                       onClick={async () => {
-                        if (!newMessageContent.trim() || !customUser) return;
+                        // Vérifier qu'au moins un titre ou un contenu est fourni
+                        if ((!newMessageTitle.trim() && !newMessageContent.trim()) || !customUser) return;
                         
                         try {
                           setIsSubmittingMessage(true);
@@ -3314,6 +3336,7 @@ export default function DashboardPage() {
                               name: `${customUser.firstName} ${customUser.lastName}`,
                               isEmployer: customUser.isEmployer
                             },
+                            title: newMessageTitle.trim(),
                             content: newMessageContent.trim(),
                             createdAt: serverTimestamp(),
                             centerCode: customUser.centerCode,
@@ -3321,6 +3344,7 @@ export default function DashboardPage() {
                           };
                           
                           await addDoc(collection(db, 'messages'), messageData);
+                          setNewMessageTitle('');
                           setNewMessageContent('');
                           toast.success('Message publié avec succès');
                         } catch (error) {
@@ -3330,9 +3354,9 @@ export default function DashboardPage() {
                           setIsSubmittingMessage(false);
                         }
                       }}
-                      disabled={isSubmittingMessage || !newMessageContent.trim()}
-                      className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200 ${
-                        isSubmittingMessage || !newMessageContent.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                      disabled={isSubmittingMessage || (!newMessageTitle.trim() && !newMessageContent.trim())}
+                      className={`inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200 ${
+                        isSubmittingMessage || (!newMessageTitle.trim() && !newMessageContent.trim()) ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     >
                       {isSubmittingMessage ? (
@@ -3346,7 +3370,7 @@ export default function DashboardPage() {
                       ) : (
                         <>
                           <PaperAirplaneIcon className="h-5 w-5 mr-2" />
-                          Publier
+                          Publier le message
                         </>
                       )}
                     </button>
@@ -3414,7 +3438,12 @@ export default function DashboardPage() {
                             </div>
                           )}
                         </div>
-                        <div className="mt-2">
+                        <div className="mt-3">
+                          {message.title && (
+                            <h4 className="text-base font-semibold text-gray-900 mb-1">
+                              {message.title}
+                            </h4>
+                          )}
                           <p className="text-gray-700 whitespace-pre-line">{message.content}</p>
                         </div>
                       </div>
@@ -3623,7 +3652,7 @@ export default function DashboardPage() {
                     <Cog6ToothIcon className="h-5 w-5 text-gray-400 group-hover:text-indigo-600" />
                     <div className="text-left">
                       <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Paramètres</p>
-                      <p className="text-xs text-gray-500">Configurer l'application</p>
+                      <p className="text-xs text-gray-500">Configurer l&apos;application</p>
                     </div>
                   </button>
                   <div className="border-t border-gray-100 my-1" />
@@ -3636,7 +3665,7 @@ export default function DashboardPage() {
                     </svg>
                     <div className="text-left">
                       <p className="text-sm font-medium">Déconnexion</p>
-                      <p className="text-xs text-red-500">Quitter l'application</p>
+                      <p className="text-xs text-red-500">Quitter l&apos;application</p>
                     </div>
                   </button>
                 </div>
@@ -3689,7 +3718,7 @@ export default function DashboardPage() {
                   <Cog6ToothIcon className="h-5 w-5 text-gray-400 group-hover:text-indigo-600" />
                   <div className="text-left">
                     <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Paramètres</p>
-                    <p className="text-xs text-gray-500">Configurer l'application</p>
+                    <p className="text-xs text-gray-500">Configurer l&apos;application</p>
                   </div>
                 </button>
                 <div className="border-t border-gray-100 my-1" />
@@ -3702,7 +3731,7 @@ export default function DashboardPage() {
                   </svg>
                   <div className="text-left">
                     <p className="text-sm font-medium">Déconnexion</p>
-                    <p className="text-xs text-red-500">Quitter l'application</p>
+                    <p className="text-xs text-red-500">Quitter l&apos;application</p>
                   </div>
                 </button>
               </div>
@@ -3888,7 +3917,7 @@ export default function DashboardPage() {
                             </svg>
                           </div>
                         </div>
-                        <p className="mt-1 text-xs text-gray-500">Ce titre apparaîtra en haut de la section d'information du centre.</p>
+                        <p className="mt-1 text-xs text-gray-500">Ce titre apparaîtra en haut de la section d&apos;information du centre.</p>
                       </div>
                       
                       {/* Sous-titre du centre */}

@@ -7,15 +7,10 @@ import { fr } from 'date-fns/locale';
 import "react-datepicker/dist/react-datepicker.css";
 import { 
   UserIcon,
-  IdentificationIcon,
   CalendarIcon,
-  LanguageIcon,
   DocumentTextIcon,
-  ExclamationTriangleIcon,
   HeartIcon,
-  ChatBubbleBottomCenterTextIcon,
   ArrowTrendingUpIcon,
-  HandRaisedIcon,
   CheckIcon,
   XMarkIcon,
   ArrowPathIcon

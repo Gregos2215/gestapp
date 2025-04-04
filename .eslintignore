@@ -1,0 +1,11 @@
+# Fichiers et dossiers à ignorer par ESLint
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+public/
+*.min.js
+*.d.ts
+runDeleteTasks.js 

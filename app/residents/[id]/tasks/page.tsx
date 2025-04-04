@@ -13,7 +13,6 @@ import {
   CalendarIcon,
   CheckIcon,
   ClockIcon,
-  UserIcon,
   XMarkIcon,
   ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline';
@@ -110,12 +109,14 @@ export default function ResidentTasksPage() {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const tasksData: Task[] = [];
       querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        tasksData.push({
+        const { status: _status, completedBy: _completedBy, id: _docId, ...rest } = doc.data();
+        const taskData = {
+          ...rest,
           id: doc.id,
-          ...data,
-          dueDate: data.dueDate?.toDate() || new Date(),
-        } as Task);
+          dueDate: rest.dueDate?.toDate() || new Date(),
+        };
+        
+        tasksData.push(taskData as Task);
       });
       setTasks(tasksData);
       setLoading(false);
@@ -156,13 +157,13 @@ export default function ResidentTasksPage() {
   };
 
   // Fonction pour normaliser une date
-  const normalizeDate = (dateInput: any): Date => {
+  const normalizeDate = (dateInput: Date | Timestamp | { toDate: () => Date }): Date => {
     if (dateInput instanceof Date) {
       return dateInput;
-    } else if (dateInput && typeof dateInput.toDate === 'function') {
-      return dateInput.toDate();
+    } else if (dateInput && typeof (dateInput as { toDate: () => Date }).toDate === 'function') {
+      return (dateInput as { toDate: () => Date }).toDate();
     }
-    return new Date(dateInput);
+    return new Date(dateInput as any);
   };
 
   // Fonction pour générer les occurrences futures des tâches récurrentes
@@ -229,7 +230,7 @@ export default function ResidentTasksPage() {
       }
       
       // Calculer si cette tâche récurrente doit apparaître à la date cible
-      let currentDate = new Date(baseDateOnly);
+      const currentDate = new Date(baseDateOnly);
       let nextOccurrence = false;
       
       while (currentDate.getTime() <= targetTimestamp) {
@@ -399,7 +400,7 @@ export default function ResidentTasksPage() {
         const currentDate = taskData.dueDate instanceof Date 
           ? taskData.dueDate 
           : (taskData.dueDate as any).toDate();
-        let nextDate = new Date(currentDate);
+        const nextDate = new Date(currentDate);
 
         // Calculer la prochaine date selon le type de récurrence
         switch (taskData.recurrenceType) {
@@ -480,7 +481,7 @@ export default function ResidentTasksPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-900">Résident non trouvé</h2>
-          <p className="mt-2 text-gray-600">Le résident que vous recherchez n'existe pas.</p>
+          <p className="mt-2 text-gray-600">Le résident que vous recherchez n&apos;existe pas.</p>
           <button
             onClick={() => router.push('/dashboard?tab=residents')}
             className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"

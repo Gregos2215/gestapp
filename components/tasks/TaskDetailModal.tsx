@@ -99,8 +99,6 @@ export default function TaskDetailModal({
 
     try {
       const taskRef = doc(db, 'tasks', task.id);
-      // Sauvegarder l'état avant la modification pour comparer
-      const oldTaskData = { ...task }; 
       
       await updateDoc(taskRef, {
         name,
@@ -153,7 +151,7 @@ export default function TaskDetailModal({
       const taskRef = doc(db, 'tasks', task.id);
       
       // Déterminer si c'est une tâche virtuelle et récupérer l'ID de la tâche parent si nécessaire
-      let isVirtual = task.isVirtualOccurrence === true;
+      const isVirtual = task.isVirtualOccurrence === true;
       let parentTaskId = task.id;
       
       if (isVirtual) {
@@ -385,7 +383,7 @@ export default function TaskDetailModal({
                           <div>
                             <label className="block text-base font-medium text-gray-900 mb-2 flex items-center gap-2">
                               <CalendarIcon className="h-5 w-5 text-indigo-600" />
-                              Date et heure d'échéance
+                              Date et heure d&apos;échéance
                             </label>
                             <div className="relative z-30">
                               <DatePicker
@@ -489,7 +487,7 @@ export default function TaskDetailModal({
                         <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
                           <div className="flex items-center text-gray-600 mb-2">
                             <CalendarIcon className="h-5 w-5 text-indigo-600 mr-2" />
-                            <span className="text-sm font-medium">Date d'échéance</span>
+                            <span className="text-sm font-medium">Date d&apos;échéance</span>
                           </div>
                           <p className="text-lg font-semibold text-gray-900">
                             {format(task.dueDate, 'dd MMMM yyyy', { locale: fr })}

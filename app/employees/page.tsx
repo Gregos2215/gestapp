@@ -9,29 +9,19 @@ import {
   getDocs, 
   doc, 
   getDoc, 
-  deleteDoc,
-  updateDoc
+  deleteDoc
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { useAuth } from '@/contexts/AuthContext';
 import { 
-  UserIcon, 
   TrashIcon, 
   ArrowLeftIcon, 
-  EnvelopeIcon, 
-  PhoneIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  ExclamationCircleIcon,
   UserCircleIcon,
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { formatDistance } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface Employee {
   id: string;
@@ -43,14 +33,6 @@ interface Employee {
   isEmployer: boolean;
   isOnline?: boolean;
   lastOnline?: Date;
-}
-
-interface CustomUser {
-  uid: string;
-  isEmployer: boolean;
-  centerCode: string;
-  firstName: string;
-  lastName: string;
 }
 
 const EmployeesPage = () => {
