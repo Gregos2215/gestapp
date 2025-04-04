@@ -1,0 +1,2 @@
+const fs = require('fs'); const path = require('path'); const filePath = path.join(__dirname, 'app/dashboard/page.tsx'); fs.readFile(filePath, 'utf8', (err, data) => { if (err) { console.error('Erreur:', err); return; } let fixedContent = data.replace(/} %[\s
+]*$/g, '}'); fs.writeFile(filePath, fixedContent, 'utf8', (err) => { if (err) { console.error('Erreur:', err); return; } console.log('Fichier corrigé'); }); });

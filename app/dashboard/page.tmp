@@ -1,0 +1,900 @@
+'use client';
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, Timestamp, getDocs, orderBy, addDoc, writeBatch, setDoc, deleteDoc, limit } from 'firebase/firestore';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import toast from 'react-hot-toast';
+import { format, addMinutes, isSameDay, startOfDay } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { 
+  HomeIcon, 
+  ClipboardDocumentListIcon, 
+  UsersIcon, 
+  DocumentTextIcon,
+  BellIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  ClockIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  Bars3Icon,
+  XMarkIcon as MenuCloseIcon,
+  CheckIcon,
+  CalendarIcon,
+  LanguageIcon,
+  UserCircleIcon,
+  Cog6ToothIcon,
+  ChevronDownIcon
+} from '@heroicons/react/24/outline';
+import CreateTaskModal from '@/components/tasks/CreateTaskModal';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
+import TaskDetailModal from '@/components/tasks/TaskDetailModal';
+import { User as FirebaseUser } from 'firebase/auth';
+import CreateResidentModal from '@/components/residents/CreateResidentModal';
+import ResidentDetailModal from '@/components/residents/ResidentDetailModal';
+import CreateReportModal from '@/components/reports/CreateReportModal';
+import ReportDetailModal from '@/components/reports/ReportDetailModal';
+
+// Enregistrer la locale française pour le DatePicker
+registerLocale('fr', fr);
+
+type Tab = 'accueil' | 'taches' | 'residents' | 'rapports' | 'alertes';
+
+interface OnlineUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  isOnline: boolean;
+  lastOnlineAt: Date | null;
+  centerCode: string;
+}
+
+interface CustomUser extends Omit<FirebaseUser, 'delete' | 'reload'> {
+  isEmployer: boolean;
+  centerCode: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface Task {
+  id: string;
+  type: 'resident' | 'general';
+  name: string;
+  description: string;
+  dueDate: Date | { toDate: () => Date } | any; // Modifier pour accepter Timestamp ou Date
+  status: 'pending' | 'completed';
+  residentId?: string;
+  residentName?: string;
+  recurrenceType: string;
+  customRecurrence?: string;
+  completedBy?: {
+    id: string;
+    name: string;
+    timestamp: Timestamp;
+  };
+  isVirtualOccurrence?: boolean;
+  deleted?: boolean;
+  deletedAt?: Timestamp;
+  deletedBy?: {
+    id: string;
+    name: string;
+  };
+  skippedDates?: number[]; // Tableau des timestamps (en millisecondes) des dates à ignorer
+  completedDates?: number[]; // Tableau des timestamps (en millisecondes) des dates complétées
+}
+
+type TaskFilter = 'all' | 'resident' | 'general' | 'upcoming' | 'past' | 'completed' | 'yesterday';
+
+interface User extends FirebaseUser {
+  firstName?: string;
+  lastName?: string;
+}
+
+interface Resident {
+  id: string;
+  firstName: string;
+  lastName: string;
+  gender: 'male' | 'female';
+  birthDate: Date;
+  language: 'french' | 'english' | 'spanish' | 'creole' | 'other';
+  description: string;
+  condition: 'intellectual_disability' | 'autism' | 'dementia';
+  hasAllergies: boolean;
+  allergies: string | null;
+  isIncontinent: boolean;
+  isVerbal: boolean;
+  autonomyLevel: 'autonomous' | 'semi-autonomous' | 'dependent';
+  hasDisability: boolean;
+  disability: string | null;
+  centerCode: string;
+}
+
+interface Report {
+  id: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: {
+    toDate: () => Date;
+  };
+}
+
+interface Alert {
+  id: string;
+  type: 'task_created' | 'report_created' | 'task_overdue';
+  title: string;
+  message: string;
+  createdAt: {
+    toDate: () => Date;
+  };
+  readBy: string[]; // Array of user IDs who have read the alert
+  relatedId?: string;
+  centerCode: string;
+  excludedUsers?: string[]; // Optional list of user IDs to exclude from notifications
+}
+
+interface CreateReportModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  centerCode: string;
+  currentUserId: string;
+  currentUserName: string;
+  onReportCreated: (reportId: string) => void;
+}
+
+// Move these component definitions before they are used
+const renderEmployeeView = (
+  isOnline: boolean,
+  toggleOnlineStatus: () => Promise<void>,
+  tasks: Task[],
+  isDateSkippedFn: (task: Task, dateOrTimestamp: Date | number) => boolean
+) => {
+  // Fonction pour obtenir les prochaines tâches à afficher, en priorité:
+  // 1. Tâches non complétées de la veille
+  // 2. Tâches en retard du jour
+  // 3. Tâches du jour à faire
+  const getNextTasks = () => {
+    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Date d'hier (à minuit)
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // 1. Tâches non complétées de la veille
+    const yesterdayTasks = tasks.filter(task => {
+      if (task.deleted === true) return false;
+      if (isDateSkippedFn(task, yesterday)) return false;
+      
+      // Convertir dueDate selon son type
+      let taskDueDate: Date;
+      if (task.dueDate instanceof Date) {
+        taskDueDate = task.dueDate;
+      } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
+        taskDueDate = task.dueDate.toDate();
+      } else {
+        taskDueDate = new Date(task.dueDate);
+      }
+      
+      // Normaliser la date de la tâche à minuit pour comparer avec hier
+      const taskDateOnly = new Date(taskDueDate);
+      taskDateOnly.setHours(0, 0, 0, 0);
+      
+      return taskDateOnly.getTime() === yesterday.getTime() && task.status !== 'completed';
+    }).sort((a, b) => {
+      // Trier par date d'échéance, les plus anciennes d'abord
+      const dateA = new Date(a.dueDate);
+      const dateB = new Date(b.dueDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    // 2. Tâches en retard du jour (passées et non complétées)
+    const overdueTasks = tasks.filter(task => {
+      if (task.deleted === true) return false;
+      if (isDateSkippedFn(task, today)) return false;
+      
+      // Convertir dueDate selon son type
+      let taskDueDate: Date;
+      if (task.dueDate instanceof Date) {
+        taskDueDate = task.dueDate;
+      } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
+        taskDueDate = task.dueDate.toDate();
+      } else {
+        taskDueDate = new Date(task.dueDate);
+      }
+      
+      // Normaliser la date de la tâche à minuit pour comparer avec aujourd'hui
+      const taskDateOnly = new Date(taskDueDate);
+      taskDateOnly.setHours(0, 0, 0, 0);
+      
+      // Tâche d'aujourd'hui qui est en retard (heure passée)
+      return taskDateOnly.getTime() === today.getTime() && taskDueDate < now && task.status !== 'completed';
+    }).sort((a, b) => {
+      // Trier par date d'échéance, les plus anciennes d'abord
+      const dateA = new Date(a.dueDate);
+      const dateB = new Date(b.dueDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    // 3. Tâches du jour à faire (pas encore passées)
+    const todayTasks = tasks.filter(task => {
+      if (task.deleted === true) return false;
+      if (isDateSkippedFn(task, today)) return false;
+      
+      // Convertir dueDate selon son type
+      let taskDueDate: Date;
+      if (task.dueDate instanceof Date) {
+        taskDueDate = task.dueDate;
+      } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
+        taskDueDate = task.dueDate.toDate();
+      } else {
+        taskDueDate = new Date(task.dueDate);
+      }
+      
+      // Normaliser la date de la tâche à minuit pour comparer avec aujourd'hui
+      const taskDateOnly = new Date(taskDueDate);
+      taskDateOnly.setHours(0, 0, 0, 0);
+      
+      // Tâche d'aujourd'hui qui n'est pas encore passée
+      return taskDateOnly.getTime() === today.getTime() && taskDueDate >= now && task.status !== 'completed';
+    }).sort((a, b) => {
+      // Trier par date d'échéance, les plus proches d'abord
+      const dateA = new Date(a.dueDate);
+      const dateB = new Date(b.dueDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    // Combiner toutes les tâches avec la priorité souhaitée
+    let nextTasks = [...yesterdayTasks, ...overdueTasks, ...todayTasks];
+    
+    // Limiter à 10 tâches maximum (au lieu de 5)
+    return nextTasks.slice(0, 10);
+  };
+  
+  const nextTasks = getNextTasks();
+  
+  return (
+    <div className="space-y-6">
+      {/* Section Mon statut */}
+      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-800">Mon statut</h2>
+          <button
+            onClick={toggleOnlineStatus}
+            className={`px-4 py-2 rounded-md text-sm font-medium text-white ${
+              isOnline
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-green-600 hover:bg-green-700'
+            } transition-colors duration-200`}
+          >
+            {isOnline ? 'Se déconnecter' : 'Se connecter en ligne'}
+          </button>
+        </div>
+        <div className="flex items-center space-x-3">
+          <div className={`h-3 w-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
+          <span className="text-sm text-gray-600">
+            {isOnline ? 'En ligne' : 'Hors ligne'}
+          </span>
+        </div>
+      </div>
+      
+      {/* Section Prochaines tâches */}
+      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-800">Prochaines tâches</h2>
+          <button
+            onClick={() => window.location.href = '/dashboard?tab=taches'}
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors duration-200"
+          >
+            Voir toutes les tâches
+          </button>
+        </div>
+        
+        {nextTasks.length > 0 ? (
+          <div className="space-y-4">
+            {nextTasks.map((task) => {
+              // Vérifier si la tâche est en retard
+              const now = new Date();
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              
+              // Date d'hier (à minuit)
+              const yesterday = new Date(today);
+              yesterday.setDate(yesterday.getDate() - 1);
+              
+              // Convertir dueDate selon son type
+              let taskDueDate: Date;
+              if (task.dueDate instanceof Date) {
+                taskDueDate = task.dueDate;
+              } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
+                taskDueDate = task.dueDate.toDate();
+              } else {
+                taskDueDate = new Date(task.dueDate);
+              }
+              
+              // Normaliser la date de la tâche pour comparer avec hier/aujourd'hui
+              const taskDateOnly = new Date(taskDueDate);
+              taskDateOnly.setHours(0, 0, 0, 0);
+              
+              const isYesterday = taskDateOnly.getTime() === yesterday.getTime();
+              const isToday = taskDateOnly.getTime() === today.getTime();
+              const isOverdue = taskDueDate < now;
+              
+              // Définir les styles et le texte en fonction du statut
+              let statusBg = 'bg-indigo-100';
+              let statusText = 'text-indigo-800';
+              let statusLabel = format(taskDueDate, 'HH:mm', { locale: fr });
+              
+              if (isYesterday) {
+                statusBg = 'bg-orange-100';
+                statusText = 'text-orange-800';
+                statusLabel = 'Hier - Non complétée';
+              } else if (isToday && isOverdue) {
+                statusBg = 'bg-red-100';
+                statusText = 'text-red-800';
+                statusLabel = 'En retard';
+              }
+              
+              return (
+                <div 
+                  key={task.id}
+                  className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer ${
+                    isYesterday
+                      ? 'border-l-4 border-l-orange-500 bg-orange-50'
+                      : isToday && isOverdue
+                        ? 'border-l-4 border-l-red-500 bg-red-50'
+                        : 'border-gray-200 hover:border-indigo-200 hover:bg-indigo-50 border-l-4 ' + 
+                          (task.type === 'resident' ? 'border-l-purple-500' : 'border-l-blue-500')
+                  }`}
+                  onClick={() => {
+                    // Si c'est une tâche de la veille, rediriger vers la section "Tâches non complétées de la veille"
+                    if (isYesterday) {
+                      window.location.href = '/dashboard?tab=taches&filter=yesterday';
+                    } else {
+                      // Sinon, rediriger vers la section des tâches du jour
+                      window.location.href = '/dashboard?tab=taches';
+                    }
+                  }}
+                >
+                  <div className="flex justify-between">
+                    <h3 className="font-medium text-gray-900">{task.name}</h3>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusBg} ${statusText}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.description}</p>
+                  <div className="mt-2 flex justify-between items-center">
+                    <span className="text-xs text-gray-500">
+                      {format(taskDueDate, 'dd/MM/yyyy', { locale: fr })}
+                    </span>
+                    <span className={`text-xs font-medium ${
+                      task.type === 'resident' ? 'text-purple-600' : 'text-blue-600'
+                    }`}>
+                      {task.type === 'resident' ? 'Résident' : 'Générale'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-center text-gray-500 py-6">
+            Aucune tâche à faire pour le moment
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const renderEmployerView = (
+  onlineUsers: OnlineUser[]
+) => (
+  <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+    <div className="flex items-center justify-between mb-6">
+      <h2 className="text-xl font-bold text-gray-800">Employés en ligne</h2>
+      <span className="text-sm text-gray-500">
+        {onlineUsers.filter(u => u.isOnline).length} actifs
+      </span>
+    </div>
+    <div className="divide-y divide-gray-100">
+      {onlineUsers.length > 0 ? (
+        onlineUsers.map((employee) => (
+          <div key={employee.id} className="py-3 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className={`h-10 w-10 rounded-full ${
+                employee.isOnline ? 'bg-green-100' : 'bg-gray-100'
+              } flex items-center justify-center`}>
+                <span className={`font-medium ${
+                  employee.isOnline ? 'text-green-600' : 'text-gray-600'
+                }`}>
+                  {employee.firstName.charAt(0).toUpperCase()}{employee.lastName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">
+                  {employee.firstName} {employee.lastName}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {employee.isOnline
+                    ? 'En ligne'
+                    : employee.lastOnlineAt
+                    ? `Dernière connexion : ${format(employee.lastOnlineAt, 'dd/MM/yyyy HH:mm', { locale: fr })}`
+                    : 'Jamais connecté'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className={`h-3 w-3 rounded-full ${
+                employee.isOnline ? 'bg-green-500' : 'bg-gray-300'
+              }`}></div>
+              <span className="text-sm text-gray-500">
+                {employee.isOnline ? 'En ligne' : 'Hors ligne'}
+              </span>
+            </div>
+          </div>
+        ))
+      ) : (
+        <p className="text-center text-gray-500 py-4">
+          Aucun employé n'est associé à ce centre
+        </p>
+      )}
+    </div>
+  </div>
+);
+
+export default function DashboardPage() {
+  const { user, logout } = useAuth() || {};
+  const searchParams = useSearchParams();
+  const [userType, setUserType] = useState<'employer' | 'employee' | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [currentResidentPage, setCurrentResidentPage] = useState(1);
+  const tasksPerPage = 6;
+  const residentsPerPage = 9;
+  const [activeTab, setActiveTab] = useState<Tab>('accueil');
+
+  const [isOnline, setIsOnline] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [centerCode, setCenterCode] = useState<string | null>(null);
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskFilter, setTaskFilter] = useState<TaskFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
+  const [isCreateResidentModalOpen, setIsCreateResidentModalOpen] = useState(false);
+  const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+  const [isResidentDetailModalOpen, setIsResidentDetailModalOpen] = useState(false);
+  const [residents, setResidents] = useState<Resident[]>([]);
+  const [isLoadingResidents, setIsLoadingResidents] = useState(false);
+  const [residentFilter, setResidentFilter] = useState<'all' | 'male' | 'female'>('all');
+  const router = useRouter();
+  const customUser = user as CustomUser | null;
+  const [isCreateReportModalOpen, setIsCreateReportModalOpen] = useState(false);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [isReportDetailModalOpen, setIsReportDetailModalOpen] = useState(false);
+  const [currentReportPage, setCurrentReportPage] = useState(1);
+  const reportsPerPage = 4;
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [profileEdits, setProfileEdits] = useState({
+    firstName: '',
+    lastName: ''
+  });
+  const [isProfileModified, setIsProfileModified] = useState(false);
+  const [userPreferences, setUserPreferences] = useState({
+    emailNotifications: false,
+    language: 'fr' as 'fr' | 'en'
+  });
+  const [tempPreferences, setTempPreferences] = useState({
+    emailNotifications: false,
+    language: 'fr' as 'fr' | 'en'
+  });
+  const [isPreferencesModified, setIsPreferencesModified] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isConfirmCompleteModalOpen, setIsConfirmCompleteModalOpen] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<string | null>(null);
+
+  // Ajouter du code dans le useEffect qui détecte les paramètres d'URL pour également détecter le filtre
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['accueil', 'taches', 'residents', 'rapports', 'alertes'].includes(tabParam)) {
+      setActiveTab(tabParam as Tab);
+      
+      // Si l'onglet est 'taches', vérifier s'il y a un paramètre de filtre
+      if (tabParam === 'taches') {
+        const filterParam = searchParams.get('filter');
+        if (filterParam && ['all', 'resident', 'general', 'upcoming', 'past', 'completed', 'yesterday'].includes(filterParam)) {
+          setTaskFilter(filterParam as TaskFilter);
+        }
+      }
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    async function getUserInfo() {
+      if (!user) return;
+      
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setUserType(userData.isEmployer ? 'employer' : 'employee');
+          setCenterCode(userData.centerCode);
+          setIsOnline(userData.isOnline || false);
+        }
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+        toast.error('Erreur lors du chargement des données utilisateur');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    getUserInfo();
+  }, [user]);
+
+  useEffect(() => {
+    if (!centerCode || !userType || userType !== 'employer') return;
+
+    console.log('Setting up employee listener for center:', centerCode);
+
+    const q = query(
+      collection(db, 'users'),
+      where('centerCode', '==', centerCode),
+      where('isEmployer', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('Received employee update, count:', snapshot.size);
+      const users: OnlineUser[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        users.push({
+          id: doc.id,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email,
+          isOnline: data.isOnline || false,
+          lastOnlineAt: data.lastOnlineAt ? data.lastOnlineAt.toDate() : null,
+          centerCode: data.centerCode
+        });
+      });
+      console.log('Updated online users:', users);
+      setOnlineUsers(users);
+    }, (error) => {
+      console.error('Error in employee listener:', error);
+      toast.error('Erreur lors de la mise à jour des employés en ligne');
+    });
+
+    return () => unsubscribe();
+  }, [centerCode, userType]);
+
+  useEffect(() => {
+    if (!customUser) {
+      setTasks([]);
+      return;
+    }
+
+    console.log(`Setting up Firestore listener for center: ${customUser.centerCode}`);
+
+    const tasksRef = collection(db, 'tasks');
+    // Les index sont maintenant créés, on peut utiliser le filtre complet
+    const q = query(
+      tasksRef,
+      where('centerCode', '==', customUser.centerCode),
+      where('deleted', '!=', true)
+    );
+
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+      console.log('[onSnapshot] Received update');
+      const tasksData: Task[] = [];
+      
+      // Récupérer tous les résidents en une seule fois
+      const residentsRef = collection(db, 'residents');
+      const residentsQuery = query(residentsRef, where('centerCode', '==', customUser.centerCode));
+      const residentsSnapshot = await getDocs(residentsQuery);
+      const residentsMap = new Map();
+      residentsSnapshot.forEach((doc) => {
+        residentsMap.set(doc.id, doc.data());
+      });
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        // Plus besoin de filtrer côté client
+        // if (data.deleted === true) return;
+        
+        const residentData = data.residentId ? residentsMap.get(data.residentId) : null;
+        
+        const taskData: Task = {
+          id: doc.id,
+          type: data.type,
+          name: data.name,
+          description: data.description,
+          dueDate: data.dueDate?.toDate ? data.dueDate.toDate() : new Date(),
+          status: data.status,
+          recurrenceType: data.recurrenceType,
+          customRecurrence: data.customRecurrence,
+          completedBy: data.completedBy ? {
+            id: data.completedBy.id || '',
+            name: data.completedBy.name || 'Inconnu',
+            timestamp: data.completedBy.timestamp || Timestamp.now()
+          } : undefined,
+          residentId: data.residentId,
+          residentName: residentData ? `${residentData.firstName} ${residentData.lastName}` : undefined,
+          isVirtualOccurrence: data.isVirtualOccurrence,
+          deleted: data.deleted,
+          deletedAt: data.deletedAt,
+          deletedBy: data.deletedBy,
+          skippedDates: data.skippedDates ? data.skippedDates.map((timestamp: any) => typeof timestamp === 'number' ? timestamp : timestamp.toMillis ? timestamp.toMillis() : Number(timestamp)) : undefined,
+          completedDates: data.completedDates ? data.completedDates.map((timestamp: any) => typeof timestamp === 'number' ? timestamp : timestamp.toMillis ? timestamp.toMillis() : Number(timestamp)) : undefined
+        };
+        
+        tasksData.push(taskData);
+      });
+      
+      console.log(`[onSnapshot] Processed ${tasksData.length} tasks.`);
+      setTasks(tasksData);
+    }, (error) => {
+      console.error('[onSnapshot] Error:', error);
+      toast.error('Erreur lors de la mise à jour des tâches.');
+    });
+
+    return () => {
+      console.log('Cleaning up Firestore listener.');
+      unsubscribe();
+    };
+  }, [customUser]);
+
+  const toggleOnlineStatus = async () => {
+    if (!user) return;
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const newStatus = !isOnline;
+      await updateDoc(userRef, {
+        isOnline: newStatus,
+        lastOnlineAt: serverTimestamp()
+      });
+      setIsOnline(newStatus);
+      toast.success(newStatus ? 'Vous êtes maintenant en ligne' : 'Vous êtes maintenant hors ligne');
+    } catch (error) {
+      console.error('Error updating online status:', error);
+      toast.error('Erreur lors de la mise à jour du statut');
+    }
+  };
+
+  const handleLogout = async () => {
+    if (!logout) {
+      toast.error("Service de déconnexion non disponible.");
+      return;
+    }
+    try {
+      await logout();
+      toast.success('Déconnexion réussie');
+      router.push('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast.error('Erreur lors de la déconnexion');
+    }
+  };
+
+  const handleTaskCreated = async (taskId: string) => {
+    if (!customUser?.centerCode) return;
+    
+    try {
+      console.log('[handleTaskCreated] taskId:', taskId);
+      console.log('[handleTaskCreated] centerCode:', customUser.centerCode);
+      
+      // Récupérer tous les utilisateurs du centre sauf l'auteur de la tâche
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('centerCode', '==', customUser.centerCode)
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      const otherUsers = usersSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(user => user.id !== customUser.uid);
+
+      console.log('[handleTaskCreated] Nombre d\'autres utilisateurs:', otherUsers.length);
+      
+      // Créer une alerte pour la nouvelle tâche seulement si d'autres utilisateurs existent
+      if (otherUsers.length > 0) {
+        console.log('[handleTaskCreated] Création d\'une alerte...');
+        
+        const alertData = {
+          type: 'task_created',
+          title: 'Nouvelle tâche créée',
+          message: 'Une nouvelle tâche a été ajoutée à la liste.',
+          createdAt: serverTimestamp(),
+          readBy: [],
+          relatedId: taskId,
+          centerCode: customUser.centerCode,
+          excludedUsers: [customUser.uid] // Exclure l'utilisateur qui a créé la tâche
+        };
+        
+        console.log('[handleTaskCreated] Données de l\'alerte:', alertData);
+        
+        const alertRef = await addDoc(collection(db, 'alerts'), alertData);
+        console.log('[handleTaskCreated] Alerte créée avec ID:', alertRef.id);
+      } else {
+        console.log('[handleTaskCreated] Aucun autre utilisateur trouvé, pas d\'alerte créée');
+      }
+      
+      toast.success('Tâche créée avec succès');
+    } catch (error) {
+      console.error('[handleTaskCreated] Error creating task alert:', error);
+      toast.error('Erreur lors de la création de l\'alerte');
+    }
+  };
+
+  const handleCompleteTask = async (taskId: string, isCompleted: boolean) => {
+    if (!user) {
+      toast.error('Vous devez être connecté pour effectuer cette action');
+      return;
+    }
+
+    // Si la tâche est déjà complétée, ne rien faire
+    if (isCompleted) {
+      return;
+    }
+
+    try {
+      // Vérifier si c'est une tâche virtuelle
+      const isVirtualTask = taskId.startsWith('virtual-');
+      let parentTaskId = taskId;
+      let timestamp: number | null = null;
+      
+      if (isVirtualTask) {
+        // L'ID est au format: virtual-[original-id]-[timestamp]
+        const parts = taskId.split('-');
+        if (parts.length >= 3) {
+          // Extraire l'ID parent et le timestamp
+          const virtualPrefix = parts[0];
+          timestamp = parseInt(parts[parts.length - 1]);
+          // Reconstruire l'ID parent (tout sauf le premier et dernier élément)
+          parentTaskId = parts.slice(1, -1).join('-');
+          
+          console.log(`Tâche virtuelle détectée: prefix=${virtualPrefix}, parent=${parentTaskId}, timestamp=${timestamp}`);
+        }
+      }
+      
+      const taskRef = doc(db, 'tasks', parentTaskId);
+      const taskDoc = await getDoc(taskRef);
+      
+      if (!taskDoc.exists()) {
+        toast.error('Cette tâche n\'existe pas dans la base de données');
+        setIsConfirmCompleteModalOpen(false);
+        setTaskToComplete(null);
+        return;
+      }
+      
+      const taskData = taskDoc.data() as Task & { id: string };
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.data();
+      
+      if (isVirtualTask && timestamp) {
+        // Pour une tâche virtuelle, nous allons marquer cette occurrence comme complétée
+        // en l'ajoutant à un tableau de dates complétées dans la tâche parent
+        let completedDates = taskData.completedDates || [];
+        
+        // Assurez-vous que completedDates est un tableau
+        if (!Array.isArray(completedDates)) {
+          completedDates = [];
+        }
+        
+        // Ajouter cette date si elle n'est pas déjà présente
+        if (!completedDates.includes(timestamp)) {
+          completedDates.push(timestamp);
+          
+          // Mettre à jour la tâche parent avec la nouvelle liste de dates complétées
+          await updateDoc(taskRef, {
+            completedDates: completedDates
+          });
+          
+          console.log(`Tâche ${parentTaskId} mise à jour avec les dates complétées:`, completedDates);
+          toast.success('Cette occurrence de la tâche a été marquée comme complétée');
+        } else {
+          console.log(`Le timestamp ${timestamp} est déjà dans la liste des dates complétées`);
+          toast.success('Cette occurrence était déjà marquée comme complétée');
+        }
+      } else {
+        // Pour une tâche normale (non virtuelle), marquer comme complétée
+        await updateDoc(taskRef, {
+          status: 'completed',
+          completedBy: {
+            id: user.uid,
+            name: `${userData?.firstName || ''} ${userData?.lastName || ''}`,
+            timestamp: serverTimestamp()
+          }
+        });
+
+        // Supprimer les alertes associées à cette tâche
+        const alertsRef = collection(db, 'alerts');
+        const alertsQuery = query(
+          alertsRef,
+          where('type', '==', 'task_overdue'),
+          where('relatedId', '==', parentTaskId),
+          where('centerCode', '==', customUser?.centerCode)
+        );
+        
+        const alertsSnapshot = await getDocs(alertsQuery);
+        const deletePromises = alertsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+
+        // Créer la prochaine occurrence si la tâche est récurrente
+        if (taskData && taskData.recurrenceType !== 'none') {
+          const currentDate = taskData.dueDate instanceof Date 
+            ? taskData.dueDate 
+            : (taskData.dueDate as any).toDate();
+          let nextDate = new Date(currentDate);
+
+          // Calculer la prochaine date selon le type de récurrence
+          switch (taskData.recurrenceType) {
+            case 'daily':
+              nextDate.setDate(nextDate.getDate() + 1);
+              break;
+            case 'twoDays':
+              nextDate.setDate(nextDate.getDate() + 2);
+              break;
+            case 'weekly':
+              nextDate.setDate(nextDate.getDate() + 7);
+              break;
+            case 'monthly':
+              nextDate.setMonth(nextDate.getMonth() + 1);
+              break;
+            case 'custom':
+              // Pour les récurrences personnalisées, on pourrait implémenter une logique plus complexe
+              // Pour l'instant, on ajoute par défaut 1 jour
+              nextDate.setDate(nextDate.getDate() + 1);
+              break;
+          }
+
+          // Créer la nouvelle tâche récurrente
+          const { id, completedBy, status, ...taskDataWithoutStatus } = taskData;
+          const newTaskData = {
+            ...taskDataWithoutStatus,
+            dueDate: Timestamp.fromDate(nextDate),
+            status: 'pending' as const,
+            completedBy: null,
+            createdAt: serverTimestamp(),
+            deleted: false // Explicitement marquer comme non supprimée
+          };
+          
+          await addDoc(collection(db, 'tasks'), newTaskData);
+        }
+
+        toast.success('Tâche marquée comme complétée');
+      }
+
+      // Fermer la modale de confirmation
+      setIsConfirmCompleteModalOpen(false);
+      setTaskToComplete(null);
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      toast.error('Erreur lors de la mise à jour du statut de la tâche');
+      
+      // Fermer la modale en cas d'erreur aussi
+      setIsConfirmCompleteModalOpen(false);
+      setTaskToComplete(null);
+    }
+  };
+
+  return (
+    <ProtectedRoute>
+      {/* Rest of the component content */}
+    </ProtectedRoute>
+  );
+} 

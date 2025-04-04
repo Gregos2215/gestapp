@@ -1,0 +1,10 @@
+                            {task.status === 'completed' ? (
+                              <div className="flex flex-col items-start">
+                                <span>Complétée</span>
+                                <span className="text-xs text-green-600">par {task.completedBy?.name}</span>
+                              </div>
+                            ) : task.isVirtualOccurrence ? (
+                              "Tâche de la veille pas complétée"
+                            ) : (
+                              'Tâche à compléter'
+                            )} 
