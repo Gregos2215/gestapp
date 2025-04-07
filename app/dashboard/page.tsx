@@ -3040,22 +3040,21 @@ export default function DashboardPage() {
                           }}
                           className="group relative bg-white rounded-xl shadow-sm hover:shadow-md border border-gray-200 transition-all duration-200 cursor-pointer"
                         >
-                          <div className="p-6">
-                            <div className="flex flex-col sm:flex-row items-start gap-4">
+                          <div className="p-4 sm:p-6">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                               <div className="flex-shrink-0">
-                                <div className="h-12 w-12 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center text-white font-semibold text-lg shadow-sm">
+                                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center text-white font-semibold text-lg shadow-sm">
                                   {report.userName.split(' ').map(n => n[0]).join('')}
                                 </div>
                               </div>
 
-                              <div className="flex-grow space-y-4">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                  <div className="flex items-center gap-3">
-                                    <h3 className="text-lg font-semibold text-gray-900">
+                              <div className="flex-grow space-y-3 sm:space-y-4 w-full">
+                                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                  <div>
+                                    <h3 className="text-lg font-semibold text-gray-900 break-words">
                                       {report.userName}
                                     </h3>
-                                    <span className="hidden sm:inline text-gray-300">•</span>
-                                    <p className="text-sm text-gray-500 font-medium">
+                                    <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">
                                       {report.createdAt && report.createdAt.toDate ? 
                                         format(report.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) :
                                         'Date non disponible'
@@ -3064,15 +3063,15 @@ export default function DashboardPage() {
                                   </div>
                                 </div>
 
-                                <div className="bg-gray-50 rounded-lg p-4 relative overflow-hidden group-hover:bg-white transition-colors duration-200 border border-gray-100">
-                                  <p className="text-gray-600 line-clamp-3 text-sm sm:text-base">
+                                <div className="bg-gray-50 rounded-lg p-3 sm:p-4 relative overflow-hidden group-hover:bg-white transition-colors duration-200 border border-gray-100">
+                                  <p className="text-gray-600 line-clamp-3 text-sm">
                                     {report.content}
                                   </p>
                                   <div className="absolute bottom-0 inset-x-0 h-8 bg-gradient-to-t from-gray-50 group-hover:from-white transition-colors duration-200" />
                                 </div>
 
                                 <div className="flex items-center justify-end">
-                                  <span className="inline-flex items-center text-sm font-medium text-indigo-600 group-hover:text-indigo-700 transition-colors duration-200">
+                                  <span className="inline-flex items-center text-xs sm:text-sm font-medium text-indigo-600 group-hover:text-indigo-700 transition-colors duration-200">
                                     Voir le rapport complet
                                     <svg className="ml-1 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -3100,19 +3099,20 @@ export default function DashboardPage() {
                       reportDate.getFullYear() === compareDate.getFullYear()
                     );
                   }).length / reportsPerPage) > 1 && (
-                    <div className="flex justify-center items-center space-x-4 pt-6">
+                    <div className="flex justify-center items-center space-x-2 sm:space-x-4 pt-6">
                       <button
                         onClick={() => setCurrentReportPage(prev => Math.max(prev - 1, 1))}
                         disabled={currentReportPage === 1}
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                        className={`px-3 sm:px-4 py-2.5 text-sm font-medium rounded-lg transition-colors duration-200 ${
                           currentReportPage === 1
                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                             : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
                         }`}
                       >
-                        Précédent
+                        <span className="hidden sm:inline">Précédent</span>
+                        <span className="inline sm:hidden">←</span>
                       </button>
-                      <span className="text-sm text-gray-700">
+                      <span className="text-xs sm:text-sm text-gray-700">
                         Page {currentReportPage} sur {Math.ceil(reports.filter(report => {
                           if (!selectedDate) return true;
                           if (!report.createdAt || !report.createdAt.toDate) return false;
@@ -3138,7 +3138,7 @@ export default function DashboardPage() {
                             reportDate.getFullYear() === compareDate.getFullYear()
                           );
                         }).length / reportsPerPage)}
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                        className={`px-3 sm:px-4 py-2.5 text-sm font-medium rounded-lg transition-colors duration-200 ${
                           currentReportPage === Math.ceil(reports.filter(report => {
                             if (!selectedDate) return true;
                             if (!report.createdAt || !report.createdAt.toDate) return false;
@@ -3154,24 +3154,25 @@ export default function DashboardPage() {
                             : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
                         }`}
                       >
-                        Suivant
+                        <span className="hidden sm:inline">Suivant</span>
+                        <span className="inline sm:hidden">→</span>
                       </button>
                     </div>
                   )}
                 </>
               ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 text-center py-16">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 text-center py-10 sm:py-16 px-4">
                   <div className="flex flex-col items-center">
-                    <div className="h-16 w-16 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
-                      <DocumentTextIcon className="h-8 w-8 text-indigo-600" />
+                    <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
+                      <DocumentTextIcon className="h-7 w-7 sm:h-8 sm:w-8 text-indigo-600" />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-1">Aucun rapport</h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Commencez par créer un nouveau rapport d'activité pour partager les informations importantes avec votre équipe.
+                    <p className="mt-1 text-sm text-gray-500 max-w-md mx-auto">
+                      Commencez par créer un nouveau rapport d&apos;activité pour partager les informations importantes avec votre équipe.
                     </p>
                     <button
                       onClick={() => setIsCreateReportModalOpen(true)}
-                      className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-colors duration-200"
+                      className="mt-6 inline-flex items-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-colors duration-200"
                     >
                       <DocumentTextIcon className="h-5 w-5 mr-2" />
                       Créer un rapport
@@ -3233,6 +3234,15 @@ export default function DashboardPage() {
                 }}
                 report={selectedReport}
                 currentUserId={customUser?.uid || ''}
+                isEmployer={customUser?.isEmployer || false}
+                onReportDeleted={() => {
+                  // Mettre à jour la liste des rapports après suppression
+                  // en filtrant le rapport supprimé
+                  setReports(prevReports => 
+                    prevReports.filter(r => r.id !== selectedReport.id)
+                  );
+                  setSelectedReport(null);
+                }}
               />
             )}
           </div>
@@ -4292,7 +4302,7 @@ export default function DashboardPage() {
         {/* Floating menu button for mobile - always visible */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center z-50 lg:hidden transition-transform duration-200 hover:scale-105"
+          className="fixed bottom-4 right-4 h-14 w-14 rounded-full bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center z-50 lg:hidden transition-transform duration-200 hover:scale-105 border-2 border-white"
           aria-label="Menu principal"
         >
           {isMobileMenuOpen ? (

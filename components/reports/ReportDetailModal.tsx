@@ -1,10 +1,10 @@
 import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 interface Report {
@@ -22,19 +22,26 @@ interface ReportDetailModalProps {
   onClose: () => void;
   report: Report;
   currentUserId: string;
+  isEmployer: boolean;
+  onReportDeleted?: () => void;
 }
 
 export default function ReportDetailModal({
   isOpen,
   onClose,
   report,
-  currentUserId
+  currentUserId,
+  isEmployer,
+  onReportDeleted
 }: ReportDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(report.content);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   const canEdit = currentUserId === report.userId;
+  const canDelete = isEmployer;
 
   const handleSave = async () => {
     if (!editedContent.trim()) {
@@ -57,6 +64,27 @@ export default function ReportDetailModal({
     }
   };
 
+  const handleDelete = async () => {
+    if (!canDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'reports', report.id));
+      toast.success('Rapport supprimé avec succès');
+      
+      onClose();
+      if (onReportDeleted) {
+        onReportDeleted();
+      }
+    } catch (error) {
+      console.error('Error deleting report:', error);
+      toast.error('Erreur lors de la suppression du rapport');
+      setShowDeleteConfirmation(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -68,7 +96,7 @@ export default function ReportDetailModal({
               <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <Dialog.Title as="h3" className="text-lg font-semibold text-white">
-                    Rapport d'activité
+                    Rapport d&apos;activité
                   </Dialog.Title>
                   <button
                     type="button"
@@ -128,40 +156,99 @@ export default function ReportDetailModal({
                 </div>
               </div>
 
-              <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 flex-shrink-0 border-t border-gray-200">
-                {isEditing ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(false)}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSave}
-                      disabled={isSaving || !editedContent.trim()}
-                      className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                        (isSaving || !editedContent.trim()) && 'opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      {isSaving ? 'Enregistrement...' : 'Enregistrer'}
-                    </button>
-                  </>
-                ) : (
+              <div className="bg-gray-50 px-6 py-4 flex justify-between gap-3 flex-shrink-0 border-t border-gray-200">
+                {canDelete && !isEditing && (
                   <button
                     type="button"
-                    onClick={onClose}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    onClick={() => setShowDeleteConfirmation(true)}
+                    className="px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 inline-flex items-center"
                   >
-                    Fermer
+                    <TrashIcon className="h-4 w-4 mr-1.5" />
+                    Supprimer
                   </button>
                 )}
+                
+                <div className="flex justify-end gap-3 ml-auto">
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={isSaving || !editedContent.trim()}
+                        className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                          (isSaving || !editedContent.trim()) && 'opacity-50 cursor-not-allowed'
+                        }`}
+                      >
+                        {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      Fermer
+                    </button>
+                  )}
+                </div>
               </div>
             </Dialog.Panel>
           </div>
         </div>
+
+        {showDeleteConfirmation && (
+          <div className="fixed inset-0 z-60 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" onClick={() => setShowDeleteConfirmation(false)}>
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <TrashIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        Confirmation de suppression
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Êtes-vous sûr de vouloir supprimer ce rapport ? Cette action est irréversible.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Suppression...' : 'Supprimer'}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={() => setShowDeleteConfirmation(false)}
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Dialog>
     </Transition.Root>
   );
