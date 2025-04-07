@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, Timestamp, getDocs, orderBy, addDoc, writeBatch, deleteDoc, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, Timestamp, getDocs, orderBy, addDoc, writeBatch, deleteDoc, limit, setDoc } from 'firebase/firestore';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import toast from 'react-hot-toast';
 import { format, isSameDay } from 'date-fns';
@@ -617,6 +617,16 @@ export default function DashboardPage() {
                 const centerData = centerDoc.data();
                 if (centerData.title) setCenterTitle(centerData.title);
                 if (centerData.subtitle) setCenterSubtitle(centerData.subtitle);
+              } else {
+                // Si le document n'existe pas, le créer avec des valeurs par défaut
+                console.log("Document du centre n'existe pas, création en cours...");
+                await setDoc(centerRef, {
+                  title: "Centre " + userData.centerCode,
+                  subtitle: "Informations du centre",
+                  createdAt: serverTimestamp()
+                });
+                setCenterTitle("Centre " + userData.centerCode);
+                setCenterSubtitle("Informations du centre");
               }
             } catch (error) {
               console.error('Error fetching center document:', error);
@@ -2113,6 +2123,16 @@ export default function DashboardPage() {
         const centerData = docSnapshot.data();
         if (centerData.title) setCenterTitle(centerData.title);
         if (centerData.subtitle) setCenterSubtitle(centerData.subtitle);
+      } else {
+        // Si le document n'existe pas, le créer avec des valeurs par défaut
+        console.log("Document du centre n'existe pas, création en cours...");
+        setDoc(centerRef, {
+          title: "Centre " + customUser.centerCode,
+          subtitle: "Informations du centre",
+          createdAt: serverTimestamp()
+        }).catch(error => {
+          console.error("Erreur lors de la création du document center:", error);
+        });
       }
     }, (error) => {
       console.error('Error listening to center document:', error);
@@ -3969,12 +3989,24 @@ export default function DashboardPage() {
                             // Mise à jour du document du centre si l'utilisateur est un employeur
                             // et que les informations du centre ont été modifiées
                             if (customUser.isEmployer && customUser.centerCode) {
-                              // Mise à jour du document du centre
+                              // Vérifier si le document du centre existe et le créer si nécessaire
                               const centerRef = doc(db, 'centers', customUser.centerCode);
-                              await updateDoc(centerRef, {
-                                title: centerTitle,
-                                subtitle: centerSubtitle
-                              });
+                              const centerDoc = await getDoc(centerRef);
+                              
+                              if (centerDoc.exists()) {
+                                // Mise à jour du document du centre existant
+                                await updateDoc(centerRef, {
+                                  title: centerTitle,
+                                  subtitle: centerSubtitle
+                                });
+                              } else {
+                                // Création du document du centre s'il n'existe pas
+                                await setDoc(centerRef, {
+                                  title: centerTitle,
+                                  subtitle: centerSubtitle,
+                                  createdAt: serverTimestamp()
+                                });
+                              }
                               console.log('Centre mis à jour avec succès');
                             }
                             
