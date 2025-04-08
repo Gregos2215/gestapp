@@ -44,6 +44,7 @@ import CreateResidentModal from '@/components/residents/CreateResidentModal';
 import ResidentDetailModal from '@/components/residents/ResidentDetailModal';
 import CreateReportModal from '@/components/reports/CreateReportModal';
 import ReportDetailModal from '@/components/reports/ReportDetailModal';
+import MessageDetailModal from '@/components/messages/MessageDetailModal';
 
 // Enregistrer la locale française pour le DatePicker
 registerLocale('fr', fr);
@@ -154,6 +155,21 @@ interface Message {
   centerCode: string;
   isPinned?: boolean;
 }
+
+// Ajouter cette fonction juste après la définition des interfaces, avant les fonctions de rendu
+
+// Fonction utilitaire pour gérer les dates Firebase de manière sécurisée
+const safeFirebaseDate = (firebaseDate: any): Date | null => {
+  if (!firebaseDate) return null;
+  if (firebaseDate instanceof Date) return firebaseDate;
+  if (firebaseDate && typeof firebaseDate.toDate === 'function') {
+    return firebaseDate.toDate();
+  }
+  if (typeof firebaseDate === 'string' || typeof firebaseDate === 'number') {
+    return new Date(firebaseDate);
+  }
+  return null;
+};
 
 // Move these component definitions before they are used
 const renderEmployeeView = (
@@ -554,6 +570,8 @@ export default function DashboardPage() {
   const [newMessageContent, setNewMessageContent] = useState('');
   const [isSubmittingMessage, setIsSubmittingMessage] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [isMessageDetailModalOpen, setIsMessageDetailModalOpen] = useState(false);
 
   // Ajouter juste après:
   // Effet pour initialiser les champs d'édition du profil quand le modal s'ouvre
@@ -3309,7 +3327,14 @@ export default function DashboardPage() {
                 </div>
                 <div className="space-y-3">
                   {pinnedMessages.map((message) => (
-                    <div key={message.id} className="bg-white rounded-lg shadow-sm border border-amber-200 p-4">
+                    <div 
+                      key={message.id} 
+                      className="bg-white rounded-lg shadow-sm border border-amber-200 p-4 cursor-pointer hover:shadow-md transition-shadow duration-200" 
+                      onClick={() => {
+                        setSelectedMessage(message);
+                        setIsMessageDetailModalOpen(true);
+                      }}
+                    >
                       <div className="flex justify-between">
                         <div className="flex items-center space-x-2">
                           <div className={`h-8 w-8 rounded-full ${message.author.isEmployer ? 'bg-indigo-100' : 'bg-green-100'} flex items-center justify-center`}>
@@ -3320,7 +3345,9 @@ export default function DashboardPage() {
                           <div>
                             <p className="font-medium text-gray-900">{message.author.name}</p>
                             <p className="text-xs text-gray-500">
-                              {format(message.createdAt.toDate(), 'dd/MM/yyyy HH:mm', { locale: fr })}
+                              {safeFirebaseDate(message.createdAt) 
+                                ? format(safeFirebaseDate(message.createdAt)!, 'dd/MM/yyyy HH:mm', { locale: fr }) 
+                                : 'Date inconnue'}
                             </p>
                           </div>
                         </div>
@@ -3349,7 +3376,7 @@ export default function DashboardPage() {
                             {message.title}
                           </h4>
                         )}
-                        <p className="text-gray-700 whitespace-pre-line">{message.content}</p>
+                        <p className="text-gray-700 whitespace-pre-line break-words overflow-hidden max-h-24 sm:max-h-32 overflow-y-auto">{message.content}</p>
                       </div>
                     </div>
                   ))}
@@ -3455,9 +3482,16 @@ export default function DashboardPage() {
               {messages.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
                   {messages
-                    .filter(message => !message.isPinned) // Exclure les messages épinglés car ils sont déjà affichés
+                    .filter(message => !message.isPinned)
                     .map((message) => (
-                      <div key={message.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                      <div 
+                        key={message.id} 
+                        className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow duration-200" 
+                        onClick={() => {
+                          setSelectedMessage(message);
+                          setIsMessageDetailModalOpen(true);
+                        }}
+                      >
                         <div className="flex justify-between">
                           <div className="flex items-center space-x-2">
                             <div className={`h-8 w-8 rounded-full ${message.author.isEmployer ? 'bg-indigo-100' : 'bg-green-100'} flex items-center justify-center`}>
@@ -3468,7 +3502,9 @@ export default function DashboardPage() {
                             <div>
                               <p className="font-medium text-gray-900">{message.author.name}</p>
                               <p className="text-xs text-gray-500">
-                                {format(message.createdAt.toDate(), 'dd/MM/yyyy HH:mm', { locale: fr })}
+                                {safeFirebaseDate(message.createdAt) 
+                                  ? format(safeFirebaseDate(message.createdAt)!, 'dd/MM/yyyy HH:mm', { locale: fr }) 
+                                  : 'Date inconnue'}
                               </p>
                             </div>
                           </div>
@@ -3515,7 +3551,7 @@ export default function DashboardPage() {
                               {message.title}
                             </h4>
                           )}
-                          <p className="text-gray-700 whitespace-pre-line">{message.content}</p>
+                          <p className="text-gray-700 whitespace-pre-line break-words overflow-hidden max-h-24 sm:max-h-32 overflow-y-auto">{message.content}</p>
                         </div>
                       </div>
                     ))}
@@ -3544,7 +3580,7 @@ export default function DashboardPage() {
                   {alerts.filter(alert => isSameDay(alert.createdAt.toDate(), new Date())).length} alertes aujourd'hui
                 </span>
               </div>
-              {alerts.some(alert => !alert.readBy?.includes(customUser?.uid || '') && isSameDay(alert.createdAt.toDate(), new Date())) && (
+              {alerts.some(alert => alert.createdAt && !alert.readBy?.includes(customUser?.uid || '') && isSameDay(alert.createdAt.toDate(), new Date())) && (
                 <button
                   onClick={markAllAlertsAsRead}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
@@ -3558,7 +3594,7 @@ export default function DashboardPage() {
               {alerts.filter(alert => isSameDay(alert.createdAt.toDate(), new Date())).length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
                   {alerts
-                    .filter(alert => isSameDay(alert.createdAt.toDate(), new Date()))
+                    .filter(alert => alert.createdAt && isSameDay(alert.createdAt.toDate(), new Date()))
                     .map((alert) => (
                       <div
                         key={alert.id}
@@ -3608,7 +3644,7 @@ export default function DashboardPage() {
                             </div>
                             <p className="text-gray-600">{alert.message}</p>
                             <p className="text-sm text-gray-500">
-                              {format(alert.createdAt.toDate(), 'HH:mm', { locale: fr })}
+                              {alert.createdAt ? format(alert.createdAt.toDate(), 'HH:mm', { locale: fr }) : 'Heure inconnue'}
                             </p>
                           </div>
                           <div className={`rounded-full p-2 ${
@@ -3645,6 +3681,7 @@ export default function DashboardPage() {
     try {
       const batch = writeBatch(db);
       const unreadAlerts = alerts.filter(alert => 
+        alert.createdAt &&
         !alert.readBy?.includes(customUser.uid) && 
         isSameDay(alert.createdAt.toDate(), new Date())
       );
@@ -4449,6 +4486,18 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+        )}
+        {selectedMessage && (
+          <MessageDetailModal
+            isOpen={isMessageDetailModalOpen}
+            onClose={() => {
+              setIsMessageDetailModalOpen(false);
+              setSelectedMessage(null);
+            }}
+            message={selectedMessage}
+            currentUserId={customUser?.uid || ''}
+            isEmployer={customUser?.isEmployer || false}
+          />
         )}
       </div>
     </ProtectedRoute>

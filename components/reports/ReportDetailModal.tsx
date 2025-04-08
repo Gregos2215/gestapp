@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
@@ -42,6 +42,43 @@ export default function ReportDetailModal({
 
   const canEdit = currentUserId === report.userId;
   const canDelete = isEmployer;
+  
+  // Gestion du bouton retour arrière
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Ajouter un état dans l'historique pour cette modale
+    window.history.pushState({ modal: 'reportDetail' }, '', window.location.href);
+
+    // Fonction pour gérer le retour en arrière
+    const handlePopState = () => {
+      // Si en mode édition, quitter ce mode
+      if (isEditing) {
+        setIsEditing(false);
+        // Ajouter un nouvel état pour maintenir la modale dans l'historique
+        window.history.pushState({ modal: 'reportDetail' }, '', window.location.href);
+      } 
+      // Si la confirmation de suppression est active, fermer cette boîte de dialogue
+      else if (showDeleteConfirmation) {
+        setShowDeleteConfirmation(false);
+        // Ajouter un nouvel état pour maintenir la modale dans l'historique
+        window.history.pushState({ modal: 'reportDetail' }, '', window.location.href);
+      } 
+      // Sinon, fermer la modale
+      else {
+        onClose();
+        // Ne pas appeler window.history.back() ici
+      }
+    };
+
+    // Ajouter l'écouteur d'événement
+    window.addEventListener('popstate', handlePopState);
+
+    // Nettoyer l'écouteur d'événement lors du démontage
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, onClose, isEditing, showDeleteConfirmation]);
 
   const handleSave = async () => {
     if (!editedContent.trim()) {

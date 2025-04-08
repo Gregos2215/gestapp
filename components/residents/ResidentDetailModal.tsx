@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon, PencilSquareIcon, TrashIcon, CheckIcon, UserIcon, LanguageIcon, CalendarIcon, HeartIcon, ClockIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
@@ -51,6 +51,43 @@ export default function ResidentDetailModal({
   const [editedResident, setEditedResident] = useState<Resident>(resident);
   const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
+
+  // Gestion du bouton retour arrière
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Ajouter un état dans l'historique pour cette modale
+    window.history.pushState({ modal: 'residentDetail' }, '', window.location.href);
+
+    // Fonction pour gérer le retour en arrière
+    const handlePopState = () => {
+      // Si on est en mode édition, quitter ce mode
+      if (isEditing) {
+        setIsEditing(false);
+        // Ajouter un nouvel état pour maintenir la modale dans l'historique
+        window.history.pushState({ modal: 'residentDetail' }, '', window.location.href);
+      } 
+      // Si on confirme la suppression, fermer cette boîte de dialogue
+      else if (isConfirmingDelete) {
+        setIsConfirmingDelete(false);
+        // Ajouter un nouvel état pour maintenir la modale dans l'historique
+        window.history.pushState({ modal: 'residentDetail' }, '', window.location.href);
+      }
+      // Sinon, fermer la modale
+      else {
+        onClose();
+        // Ne pas appeler window.history.back() ici
+      }
+    };
+
+    // Ajouter l'écouteur d'événement
+    window.addEventListener('popstate', handlePopState);
+
+    // Nettoyer l'écouteur d'événement lors du démontage
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, onClose, isEditing, isConfirmingDelete]);
 
   const handleSave = async () => {
     try {

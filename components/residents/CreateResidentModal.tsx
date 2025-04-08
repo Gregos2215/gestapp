@@ -1,5 +1,5 @@
 import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
+import { Fragment, useEffect } from 'react';
 import CreateResidentForm from './CreateResidentForm';
 
 interface CreateResidentModalProps {
@@ -15,6 +15,28 @@ export default function CreateResidentModal({
   centerCode,
   onResidentCreated
 }: CreateResidentModalProps) {
+  // Gestion du bouton retour arrière
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Ajouter un état dans l'historique pour cette modale
+    window.history.pushState({ modal: 'createResident' }, '', window.location.href);
+
+    // Fonction pour gérer le retour en arrière
+    const handlePopState = () => {
+      onClose();
+      // Ne pas appeler window.history.back() ici
+    };
+
+    // Ajouter l'écouteur d'événement
+    window.addEventListener('popstate', handlePopState);
+
+    // Nettoyer l'écouteur d'événement lors du démontage
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, onClose]);
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>

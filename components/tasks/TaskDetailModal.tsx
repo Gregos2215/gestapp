@@ -106,6 +106,43 @@ export default function TaskDetailModal({
     );
   };
 
+  // Gestion du bouton retour arrière
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Ajouter un état dans l'historique pour cette modale
+    window.history.pushState({ modal: 'taskDetail' }, '', window.location.href);
+
+    // Fonction pour gérer le retour en arrière
+    const handlePopState = () => {
+      // Si le mode édition est actif, simplement quitter le mode édition
+      if (editMode) {
+        setEditMode(false);
+        // Ajouter un nouvel état pour maintenir la modale dans l'historique
+        window.history.pushState({ modal: 'taskDetail' }, '', window.location.href);
+      } 
+      // Si la confirmation de suppression est active, fermer cette boîte de dialogue
+      else if (showDeleteConfirmation) {
+        setShowDeleteConfirmation(false);
+        // Ajouter un nouvel état pour maintenir la modale dans l'historique
+        window.history.pushState({ modal: 'taskDetail' }, '', window.location.href);
+      }
+      // Sinon, fermer la modale
+      else {
+        onClose();
+        // Ne pas appeler window.history.back() ici
+      }
+    };
+
+    // Ajouter l'écouteur d'événement
+    window.addEventListener('popstate', handlePopState);
+
+    // Nettoyer l'écouteur d'événement lors du démontage
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, onClose, editMode, showDeleteConfirmation]);
+
   useEffect(() => {
     if (task) {
       setName(task.name);

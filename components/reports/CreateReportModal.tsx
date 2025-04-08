@@ -31,6 +31,28 @@ export default function CreateReportModal({
     }
   }, [isOpen]);
 
+  // Gestion du bouton retour arrière
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Ajouter un état dans l'historique pour cette modale
+    window.history.pushState({ modal: 'createReport' }, '', window.location.href);
+
+    // Fonction pour gérer le retour en arrière
+    const handlePopState = () => {
+      onClose();
+      // Ne pas appeler window.history.back() ici
+    };
+
+    // Ajouter l'écouteur d'événement
+    window.addEventListener('popstate', handlePopState);
+
+    // Nettoyer l'écouteur d'événement lors du démontage
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, onClose]);
+
   const handleSubmit = async () => {
     if (!content.trim()) {
       toast.error('Le contenu du rapport ne peut pas être vide');
