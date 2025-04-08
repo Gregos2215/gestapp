@@ -33,6 +33,7 @@ interface TaskDetailModalProps {
     residentName?: string;
     recurrenceType: string;
     customRecurrence?: string;
+    specificDays?: string[];
     completedBy?: {
       id: string;
       name: string;
@@ -81,8 +82,29 @@ export default function TaskDetailModal({
   const [dueDate, setDueDate] = useState<Date>(new Date());
   const [type, setType] = useState<'resident' | 'general'>('general');
   const [recurrenceType, setRecurrenceType] = useState('none');
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deleteOption, setDeleteOption] = useState<'single' | 'all'>('single');
+
+  // Weekdays en français avec leurs valeurs correspondantes
+  const weekdays = [
+    { label: 'Lundi', value: 'monday' },
+    { label: 'Mardi', value: 'tuesday' },
+    { label: 'Mercredi', value: 'wednesday' },
+    { label: 'Jeudi', value: 'thursday' },
+    { label: 'Vendredi', value: 'friday' },
+    { label: 'Samedi', value: 'saturday' },
+    { label: 'Dimanche', value: 'sunday' }
+  ];
+
+  // Gérer la sélection des jours
+  const toggleDaySelection = (day: string) => {
+    setSelectedDays(prev => 
+      prev.includes(day) 
+        ? prev.filter(d => d !== day) 
+        : [...prev, day]
+    );
+  };
 
   useEffect(() => {
     if (task) {
@@ -91,6 +113,7 @@ export default function TaskDetailModal({
       setDueDate(new Date(task.dueDate));
       setType(task.type);
       setRecurrenceType(task.recurrenceType);
+      setSelectedDays(task.specificDays || []);
     }
   }, [task]);
 
@@ -100,13 +123,21 @@ export default function TaskDetailModal({
     try {
       const taskRef = doc(db, 'tasks', task.id);
       
-      await updateDoc(taskRef, {
+      // Créer l'objet de mise à jour de base
+      const updateData: any = {
         name,
         description,
         dueDate,
         type,
         recurrenceType,
-      });
+      };
+      
+      // Ajouter les jours spécifiques si c'est le type de récurrence choisi
+      if (recurrenceType === 'specificDays') {
+        updateData.specificDays = selectedDays;
+      }
+      
+      await updateDoc(taskRef, updateData);
       
       const updatedTaskData = { 
         ...task, 
@@ -114,7 +145,8 @@ export default function TaskDetailModal({
         description, 
         dueDate, 
         type, 
-        recurrenceType 
+        recurrenceType,
+        ...(recurrenceType === 'specificDays' && { specificDays: selectedDays })
       };
       
       // Mettre à jour lastModifiedBy
@@ -428,8 +460,39 @@ export default function TaskDetailModal({
                               <option value="threeWeeks">Toutes les 3 semaines</option>
                               <option value="monthly">Mensuelle</option>
                               <option value="yearly">Annuelle</option>
+                              <option value="specificDays">Jours spécifiques</option>
                             </select>
                           </div>
+                          
+                          {/* Afficher les jours spécifiques si le type de récurrence est "specificDays" */}
+                          {recurrenceType === 'specificDays' && (
+                            <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                              <label className="block text-sm font-medium text-gray-700 mb-3">
+                                Sélectionnez les jours de récurrence
+                              </label>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {weekdays.map(day => (
+                                  <div key={day.value} className="flex items-center">
+                                    <input
+                                      id={`day-${day.value}`}
+                                      type="checkbox"
+                                      checked={selectedDays.includes(day.value)}
+                                      onChange={() => toggleDaySelection(day.value)}
+                                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                    />
+                                    <label htmlFor={`day-${day.value}`} className="ml-2 block text-sm text-gray-700">
+                                      {day.label}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                              {selectedDays.length === 0 && (
+                                <p className="text-xs text-amber-600 mt-2">
+                                  Veuillez sélectionner au moins un jour
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </> 
@@ -513,6 +576,8 @@ export default function TaskDetailModal({
                         <p className="text-lg font-semibold text-gray-900">
                           {task.recurrenceType === 'none'
                             ? 'Aucune'
+                            : task.recurrenceType === 'specificDays'
+                            ? 'Jours spécifiques'
                             : {
                                 'daily': 'Quotidienne',
                                 'twoDays': 'Tous les 2 jours',
@@ -527,6 +592,23 @@ export default function TaskDetailModal({
                                 'yearly': 'Annuelle'
                               }[task.recurrenceType]}
                         </p>
+                        
+                        {/* Afficher les jours spécifiques si présents */}
+                        {task.recurrenceType === 'specificDays' && task.specificDays && task.specificDays.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {task.specificDays.map(day => (
+                              <span key={day} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-indigo-100 text-indigo-800">
+                                {day === 'monday' && 'Lundi'}
+                                {day === 'tuesday' && 'Mardi'}
+                                {day === 'wednesday' && 'Mercredi'}
+                                {day === 'thursday' && 'Jeudi'}
+                                {day === 'friday' && 'Vendredi'}
+                                {day === 'saturday' && 'Samedi'}
+                                {day === 'sunday' && 'Dimanche'}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Information de complétion */}
@@ -591,7 +673,8 @@ export default function TaskDetailModal({
                     <button
                       type="button"
                       onClick={handleSave}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      disabled={recurrenceType === 'specificDays' && selectedDays.length === 0}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
                     >
                       <CheckIcon className="h-4 w-4 mr-1.5" />
                       Enregistrer

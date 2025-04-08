@@ -72,35 +72,21 @@ interface Task {
   type: 'resident' | 'general';
   name: string;
   description: string;
-  dueDate: Date | { toDate: () => Date };
-  status: 'pending' | 'completed';
+  dueDate: Date | { toDate(): Date };
+  recurrenceType: 'daily' | 'twoDays' | 'weekly' | 'monthly' | 'threeDays' | 'fourDays' | 'fiveDays' | 'sixDays' | 'twoWeeks' | 'threeWeeks' | 'yearly' | 'specificDays' | 'none';
+  status: 'pending' | 'completed' | 'skipped';
+  centerCode: string;
   residentId?: string;
   residentName?: string;
-  recurrenceType: string;
-  customRecurrence?: string;
-  completedBy?: {
-    id: string;
-    name: string;
-    timestamp: Timestamp;
-  };
-  isVirtualOccurrence?: boolean;
   deleted?: boolean;
-  deletedAt?: Timestamp;
-  deletedBy?: {
-    id: string;
-    name: string;
-  };
-  skippedDates?: number[]; // Tableau des timestamps (en millisecondes) des dates à ignorer
+  isVirtualOccurrence?: boolean;
+  skippedDates?: number[];
   createdBy?: {
     id: string;
     name: string;
     timestamp: Timestamp;
   };
-  lastModifiedBy?: {
-    id: string;
-    name: string;
-    timestamp: Timestamp;
-  };
+  specificDays?: string[]; // Liste des jours spécifiques où la tâche doit être répétée
 }
 
 type TaskFilter = 'all' | 'resident' | 'general' | 'upcoming' | 'past' | 'completed' | 'yesterday';
@@ -753,7 +739,8 @@ export default function DashboardPage() {
             id: data.lastModifiedBy.id || '',
             name: data.lastModifiedBy.name || 'Inconnu',
             timestamp: data.lastModifiedBy.timestamp || Timestamp.now()
-          } : undefined
+          } : undefined,
+          specificDays: data.specificDays
         };
         
         tasksData.push(taskData);
@@ -1107,7 +1094,7 @@ export default function DashboardPage() {
     } else if (dateInput && typeof dateInput.toDate === 'function') {
       return dateInput.toDate();
     } else {
-      return new Date(dateInput);
+      return new Date(dateInput as string | number);
     }
   };
 
@@ -1183,6 +1170,39 @@ export default function DashboardPage() {
       
       // Si la date de base est exactement la date cible, ne rien faire (la tâche est déjà visible)
       if (baseDateOnly.getTime() === targetTimestamp) {
+        continue;
+      }
+      
+      // Gestion spéciale pour le type de récurrence "specificDays"
+      if (task.recurrenceType === 'specificDays') {
+        // Vérifier si la date cible correspond à un des jours spécifiques sélectionnés
+        const targetDay = targetDate.getDay();
+        // Convertir le jour de la semaine (0-6, où 0 est dimanche) en format "monday", "tuesday", etc.
+        const weekDays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+        const targetDayName = weekDays[targetDay];
+        
+        // Vérifier si ce jour est dans la liste des jours spécifiques de la tâche
+        if (task.specificDays && task.specificDays.includes(targetDayName)) {
+          // Vérifier si la date de base est antérieure à la date cible
+          if (baseDateOnly.getTime() < targetTimestamp) {
+            // Créer la nouvelle date avec l'heure originale
+            const newDate = new Date(targetDate);
+            newDate.setHours(originalHours, originalMinutes, 0, 0);
+            
+            const virtualOccurrence: Task = {
+              ...task,
+              id: `virtual-${task.id}-${targetTimestamp}`,
+              dueDate: newDate,
+              status: 'pending',
+              isVirtualOccurrence: true
+            };
+            
+            result.push(virtualOccurrence);
+            console.log(`[generateFutureOccurrences] Adding virtual occurrence for specificDays task ${task.id} on ${targetDayName}`);
+          }
+        }
+        
+        // Passer à la tâche suivante, car nous avons déjà traité ce cas spécial
         continue;
       }
       
