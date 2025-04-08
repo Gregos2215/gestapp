@@ -1684,6 +1684,7 @@ export default function DashboardPage() {
                   selected={selectedDate}
                   onChange={(date) => setSelectedDate(date as Date)}
                   dateFormat="dd/MM/yyyy"
+                  placeholderText="Sélectionner une date"
                   customInput={
                     <input
                       className={`w-full sm:w-auto px-4 py-2 rounded-lg border ${
@@ -1691,6 +1692,7 @@ export default function DashboardPage() {
                           ? 'border-amber-500 text-amber-700'
                           : 'border-gray-300 text-gray-700'
                         } focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 placeholder-gray-600 text-gray-700`}
+                      placeholder="Sélectionner une date"
                     />
                   }
                 />
@@ -2692,7 +2694,10 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-gray-800">Derniers rapports</h2>
                     <button
-                      onClick={() => setActiveTab('rapports')}
+                      onClick={() => {
+                        setActiveTab('rapports');
+                        window.scrollTo(0, 0);
+                      }}
                       className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors duration-200"
                     >
                       Voir tous les rapports
@@ -2709,6 +2714,8 @@ export default function DashboardPage() {
                             className="p-4 border border-gray-200 rounded-lg hover:border-indigo-200 hover:bg-indigo-50 transition-all duration-200 cursor-pointer group"
                             onClick={() => {
                               setSelectedReport(report);
+                              setActiveTab('rapports');
+                              window.scrollTo(0, 0); // Ajout du défilement vers le haut
                               setIsReportDetailModalOpen(true);
                             }}
                           >

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, collection, query, where, onSnapshot, Timestamp, updateDoc, serverTimestamp, addDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -68,7 +68,7 @@ export default function ResidentTasksPage() {
   const { user } = useAuth() || {};
   const [resident, setResident] = useState<Resident | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [loading, setLoading] = useState(true);
   const [isConfirmCompleteModalOpen, setIsConfirmCompleteModalOpen] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<string | null>(null);
@@ -306,49 +306,33 @@ export default function ResidentTasksPage() {
     // Ne pas afficher les tâches marquées comme supprimées
     if (task.deleted === true) return false;
     
-    let dateToCheck: Date;
-    
-    if (!selectedDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      dateToCheck = today;
-      const taskDate = new Date(task.dueDate);
-      taskDate.setHours(0, 0, 0, 0);
-      
-      // Vérifier si cette date est ignorée pour cette tâche
-      if (isDateSkipped(task, dateToCheck)) {
-        return false;
-      }
-      
-      return taskDate.getTime() === today.getTime() && task.status === 'pending';
-    }
-
-    const selectedDateTime = new Date(selectedDate);
+    // Normaliser la date sélectionnée pour comparaison (minuit)
+    const selectedDateTime = new Date(selectedDate || new Date());
     selectedDateTime.setHours(0, 0, 0, 0);
-    dateToCheck = selectedDateTime;
+    
+    // Normaliser la date de la tâche pour comparaison (minuit)
     const taskDate = new Date(task.dueDate);
     taskDate.setHours(0, 0, 0, 0);
     
     // Vérifier si cette date est ignorée pour cette tâche
-    if (isDateSkipped(task, dateToCheck)) {
+    if (isDateSkipped(task, selectedDateTime)) {
       return false;
     }
     
+    // Comparer les dates au niveau du jour seulement
     return taskDate.getTime() === selectedDateTime.getTime();
   });
 
   // Ajouter les occurrences virtuelles pour les dates futures sélectionnées
   const tasksWithVirtualOccurrences = useMemo(() => {
-    if (!selectedDate) return filteredTasks;
-    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const selectedDay = new Date(selectedDate);
+    const selectedDay = new Date(selectedDate || new Date());
     selectedDay.setHours(0, 0, 0, 0);
     
-    // Si la date sélectionnée est dans le futur ou pas aujourd'hui, générer des occurrences virtuelles
+    // Si la date sélectionnée est dans le futur ou aujourd'hui, générer des occurrences virtuelles
     if (selectedDay.getTime() >= today.getTime()) {
-      const virtualOccurrences = generateFutureOccurrences(tasks, selectedDate);
+      const virtualOccurrences = generateFutureOccurrences(tasks, selectedDate || new Date());
       return [...filteredTasks, ...virtualOccurrences];
     }
     
@@ -526,14 +510,16 @@ export default function ResidentTasksPage() {
                 customInput={
                   <input
                     className="w-full sm:w-auto"
+                    placeholder="Sélectionnez une date"
                   />
                 }
               />
               <CalendarIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               {selectedDate && (
                 <button
-                  onClick={() => setSelectedDate(null)}
+                  onClick={() => setSelectedDate(new Date())}
                   className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  title="Revenir à aujourd'hui"
                 >
                   <XMarkIcon className="h-5 w-5" />
                 </button>
@@ -651,9 +637,9 @@ export default function ResidentTasksPage() {
                 </div>
                 <h3 className="mt-2 text-sm font-medium text-gray-900">Aucune tâche</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {selectedDate
-                    ? 'Aucune tâche pour cette date'
-                    : 'Aucune tâche à faire aujourd\'hui'}
+                  {isToday(selectedDate || new Date())
+                    ? 'Aucune tâche prévue pour aujourd\'hui'
+                    : `Aucune tâche prévue pour le ${format(selectedDate || new Date(), 'dd/MM/yyyy', { locale: fr })}`}
                 </p>
               </div>
             )}

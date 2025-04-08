@@ -24,7 +24,7 @@ export default function LoginForm() {
     try {
       setLoading(true);
       await signIn(email, password);
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message);
