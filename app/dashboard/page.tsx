@@ -174,7 +174,8 @@ const renderEmployeeView = (
   isOnline: boolean,
   toggleOnlineStatus: () => Promise<void>,
   tasks: Task[],
-  isDateSkippedFn: (task: Task, dateOrTimestamp: Date | number) => boolean
+  isDateSkippedFn: (task: Task, dateOrTimestamp: Date | number) => boolean,
+  router: ReturnType<typeof useRouter>
 ) => {
   // Fonction pour obtenir les prochaines tâches à afficher, en priorité:
   // 1. Tâches non complétées de la veille
@@ -311,7 +312,7 @@ const renderEmployeeView = (
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-800">Prochaines tâches</h2>
           <button
-            onClick={() => window.location.href = '/dashboard?tab=taches'}
+            onClick={() => router.push('/dashboard?tab=taches')}
             className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors duration-200"
           >
             Voir toutes les tâches
@@ -377,10 +378,10 @@ const renderEmployeeView = (
                   onClick={() => {
                     // Si c'est une tâche de la veille, rediriger vers la section "Tâches non complétées de la veille"
                     if (isYesterday) {
-                      window.location.href = '/dashboard?tab=taches&filter=yesterday';
+                      router.push('/dashboard?tab=taches&filter=yesterday');
                     } else {
                       // Sinon, rediriger vers la section des tâches du jour
-                      window.location.href = '/dashboard?tab=taches';
+                      router.push('/dashboard?tab=taches');
                     }
                   }}
                 >
@@ -593,8 +594,12 @@ export default function DashboardPage() {
           setTaskFilter(filterParam as TaskFilter);
         }
       }
+    } else if (!tabParam && router) {
+      // Si aucun paramètre de tab n'est présent, s'assurer que nous avons une entrée d'historique correcte
+      // pour l'onglet d'accueil par défaut
+      router.replace('/dashboard?tab=accueil');
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   useEffect(() => {
     async function getUserInfo() {
@@ -2353,7 +2358,7 @@ export default function DashboardPage() {
                   setActiveTab('taches');
                   setTaskFilter('all');
                   setSelectedDate(null);
-                  window.history.pushState({}, '', `?tab=taches&filter=all`);
+                  router.push(`/dashboard?tab=taches&filter=all`);
                 }}
                 className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200"
               >
@@ -2414,7 +2419,10 @@ export default function DashboardPage() {
                 </p>
               </button>
               <button
-                onClick={() => setActiveTab('residents')}
+                onClick={() => {
+                  setActiveTab('residents');
+                  router.push(`/dashboard?tab=residents`);
+                }}
                 className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200"
               >
                 <div className="flex items-center justify-between">
@@ -2427,7 +2435,10 @@ export default function DashboardPage() {
                 </p>
               </button>
               <button
-                onClick={() => setActiveTab('rapports')}
+                onClick={() => {
+                  setActiveTab('rapports');
+                  router.push(`/dashboard?tab=rapports`);
+                }}
                 className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200"
               >
                 <div className="flex items-center justify-between">
@@ -2445,7 +2456,10 @@ export default function DashboardPage() {
                 <p className="text-amber-100 text-sm mt-2">aujourd&apos;hui</p>
               </button>
               <button
-                onClick={() => setActiveTab('alertes')}
+                onClick={() => {
+                  setActiveTab('alertes');
+                  router.push(`/dashboard?tab=alertes`);
+                }}
                 className="bg-gradient-to-br from-rose-600 to-rose-700 rounded-xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200"
               >
                 <div className="flex items-center justify-between">
@@ -2742,7 +2756,7 @@ export default function DashboardPage() {
               </>
             ) : (
               <>
-                {renderEmployeeView(isOnline, toggleOnlineStatus, tasks, isDateSkipped)}
+                {renderEmployeeView(isOnline, toggleOnlineStatus, tasks, isDateSkipped, router)}
               </>
             )}
           </div>
@@ -3544,7 +3558,8 @@ export default function DashboardPage() {
                               setActiveTab('taches');
                               setTaskFilter('all');
                               setSelectedDate(null);
-                              window.history.pushState({}, '', `?tab=taches&filter=all`);
+                              // Utiliser router.push à la place de window.history pour une meilleure gestion de l'historique
+                              router.push(`/dashboard?tab=${alert.type}&filter=all`);
                               const task = tasks.find(t => t.id === alert.relatedId);
                               if (task) {
                                 setSelectedTask(task);
@@ -4202,7 +4217,10 @@ export default function DashboardPage() {
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-center h-20 border-b border-gray-200">
               <button
-                onClick={() => setActiveTab('accueil')}
+                onClick={() => {
+                  setActiveTab('accueil');
+                  router.push(`/dashboard?tab=accueil`);
+                }}
                 className="group flex items-center space-x-3 px-4 py-2 rounded-xl transition-all duration-300 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 focus:outline-none"
               >
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-200/50 transition-all duration-300 group-hover:shadow-indigo-300/50 group-hover:scale-105">
@@ -4224,10 +4242,11 @@ export default function DashboardPage() {
                     if (item.tab === 'taches') {
                       setTaskFilter('all');
                       setSelectedDate(null);
-                      window.history.pushState({}, '', `?tab=${item.tab}&filter=all`);
+                      // Utiliser router.push à la place de window.history pour une meilleure gestion de l'historique
+                      router.push(`/dashboard?tab=${item.tab}&filter=all`);
                     } else {
-                      // Mettre à jour l'URL sans recharger la page
-                      window.history.pushState({}, '', `?tab=${item.tab}`);
+                      // Utiliser router.push pour créer une entrée dans l'historique
+                      router.push(`/dashboard?tab=${item.tab}`);
                     }
                   }}
                   className={`w-full flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
@@ -4287,7 +4306,10 @@ export default function DashboardPage() {
         <div className="fixed top-0 left-0 z-50 w-full bg-white border-b border-gray-200 lg:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <button
-              onClick={() => setActiveTab('accueil')}
+              onClick={() => {
+                setActiveTab('accueil');
+                router.push(`/dashboard?tab=accueil`);
+              }}
               className="group flex items-center space-x-2 focus:outline-none"
             >
               <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-200/50 transition-all duration-300 group-hover:shadow-indigo-300/50 group-hover:scale-105">
