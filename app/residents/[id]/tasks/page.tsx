@@ -184,20 +184,55 @@ export default function ResidentTasksPage() {
       taskDateOnly.setHours(0, 0, 0, 0);
       
       if (taskDateOnly.getTime() === targetTimestamp) {
-        existingTasksAtTargetDate.add(task.id.replace(/^virtual-.*-/, ''));
+        // Capturer l'ID de base de la tâche (sans le préfixe virtual pour les occurrences virtuelles)
+        const baseTaskId = task.id.replace(/^virtual-.*-/, '');
+        existingTasksAtTargetDate.add(baseTaskId);
       }
     });
     
-    // Filtrer pour ne traiter que les tâches récurrentes non complétées et non virtuelles
-    const recurrentTasks = tasks.filter(
+    // Ne considérer que la version la plus récente de chaque tâche récurrente
+    // Créer un Map où la clé est le nom+description de la tâche (identifiant unique)
+    // et la valeur est la tâche avec la date d'échéance la plus récente
+    const latestRecurrentTasks = new Map<string, Task>();
+    
+    // Filtrer d'abord pour ne garder que les tâches récurrentes non virtuelles et non supprimées
+    const allRecurrentTasks = tasks.filter(
       task => 
         task.recurrenceType !== 'none' && 
-        task.status !== 'completed' &&
         !task.isVirtualOccurrence &&
         !task.deleted
     );
-
-    for (const task of recurrentTasks) {
+    
+    // Organiser les tâches par "identité" (nom+description) et ne garder que la plus récente
+    allRecurrentTasks.forEach(task => {
+      // Créer un identifiant unique pour chaque "lignée" de tâche récurrente
+      const taskIdentity = `${task.name}-${task.description}`;
+      
+      // Si cette "lignée" n'existe pas encore dans notre Map, l'ajouter
+      if (!latestRecurrentTasks.has(taskIdentity)) {
+        latestRecurrentTasks.set(taskIdentity, task);
+        return;
+      }
+      
+      // Si elle existe, vérifier si cette tâche est plus récente
+      const existingTask = latestRecurrentTasks.get(taskIdentity)!;
+      const existingDate = normalizeDate(existingTask.dueDate);
+      const currentDate = normalizeDate(task.dueDate);
+      
+      if (currentDate.getTime() > existingDate.getTime()) {
+        // Cette tâche est plus récente, remplacer
+        latestRecurrentTasks.set(taskIdentity, task);
+      }
+    });
+    
+    // Map pour suivre les tâches déjà traitées pour cette date cible
+    const processedTasksForTargetDate = new Map();
+    
+    // Maintenant, utiliser seulement les tâches les plus récentes pour générer les occurrences futures
+    for (const task of latestRecurrentTasks.values()) {
+      // Ne considérer que les tâches non complétées pour générer des occurrences futures
+      if (task.status === 'completed') continue;
+      
       // Vérifier si cette tâche existe déjà à la date cible
       if (existingTasksAtTargetDate.has(task.id)) {
         continue;
@@ -205,6 +240,12 @@ export default function ResidentTasksPage() {
       
       // Vérifier si cette date est dans la liste des dates à ignorer
       if (isDateSkipped(task, normalizedTargetDate)) {
+        continue;
+      }
+
+      // Vérifier si on a déjà traité une occurrence virtuelle de cette tâche pour cette date
+      const taskKey = `${task.id}-${targetTimestamp}`;
+      if (processedTasksForTargetDate.has(taskKey)) {
         continue;
       }
       
@@ -295,6 +336,9 @@ export default function ResidentTasksPage() {
           isVirtualOccurrence: true
         };
         
+        // Marquer cette tâche comme traitée pour cette date cible
+        processedTasksForTargetDate.set(taskKey, true);
+        
         result.push(virtualOccurrence);
       }
     }
@@ -302,26 +346,80 @@ export default function ResidentTasksPage() {
     return result;
   };
 
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = useMemo(() => {
     // Ne pas afficher les tâches marquées comme supprimées
-    if (task.deleted === true) return false;
+    const filtered = tasks.filter(task => {
+      if (task.deleted === true) return false;
+      
+      // Normaliser la date sélectionnée pour comparaison (minuit)
+      const selectedDateTime = new Date(selectedDate || new Date());
+      selectedDateTime.setHours(0, 0, 0, 0);
+      
+      // Normaliser la date de la tâche pour comparaison (minuit)
+      const taskDate = new Date(task.dueDate);
+      taskDate.setHours(0, 0, 0, 0);
+      
+      // Vérifier si cette date est ignorée pour cette tâche
+      if (isDateSkipped(task, selectedDateTime)) {
+        return false;
+      }
+      
+      // Comparer les dates au niveau du jour seulement
+      return taskDate.getTime() === selectedDateTime.getTime();
+    });
     
-    // Normaliser la date sélectionnée pour comparaison (minuit)
-    const selectedDateTime = new Date(selectedDate || new Date());
-    selectedDateTime.setHours(0, 0, 0, 0);
+    // Éliminer les doublons en gardant préférablement les tâches non virtuelles et les plus récentes
+    const uniqueTasks = new Map<string, Task>();
     
-    // Normaliser la date de la tâche pour comparaison (minuit)
-    const taskDate = new Date(task.dueDate);
-    taskDate.setHours(0, 0, 0, 0);
+    // Trier les tâches par date de création (si disponible), les plus récentes d'abord
+    const sortedTasks = [...filtered].sort((a, b) => {
+      // Priorité aux tâches non virtuelles
+      if (a.isVirtualOccurrence && !b.isVirtualOccurrence) return 1;
+      if (!a.isVirtualOccurrence && b.isVirtualOccurrence) return -1;
+      
+      // Pour deux tâches réelles, prioriser celle qui n'est pas complétée
+      if (!a.isVirtualOccurrence && !b.isVirtualOccurrence) {
+        if (a.status === 'completed' && b.status !== 'completed') return 1;
+        if (a.status !== 'completed' && b.status === 'completed') return -1;
+      }
+      
+      // Si les deux sont virtuelles ou les deux sont réelles avec le même statut,
+      // trier par date de création (si disponible)
+      if (a.createdBy?.timestamp && b.createdBy?.timestamp) {
+        const dateA = a.createdBy.timestamp.toDate ? a.createdBy.timestamp.toDate() : new Date();
+        const dateB = b.createdBy.timestamp.toDate ? b.createdBy.timestamp.toDate() : new Date();
+        return dateB.getTime() - dateA.getTime(); // Plus récent d'abord
+      }
+      
+      return 0;
+    });
     
-    // Vérifier si cette date est ignorée pour cette tâche
-    if (isDateSkipped(task, selectedDateTime)) {
-      return false;
-    }
+    // Ajouter les tâches au Map en utilisant un identifiant composite
+    sortedTasks.forEach(task => {
+      // Créer un identifiant unique basé sur le nom et la description
+      const taskIdentity = `${task.name}-${task.description}`;
+      
+      // Ne pas remplacer si on a déjà une version non virtuelle de cette tâche
+      if (uniqueTasks.has(taskIdentity)) {
+        const existingTask = uniqueTasks.get(taskIdentity)!;
+        
+        // Si l'existante est virtuelle et celle-ci ne l'est pas, remplacer
+        if (existingTask.isVirtualOccurrence && !task.isVirtualOccurrence) {
+          uniqueTasks.set(taskIdentity, task);
+        }
+        // Si les deux sont non virtuelles mais celle-ci n'est pas complétée, remplacer
+        else if (!existingTask.isVirtualOccurrence && !task.isVirtualOccurrence && 
+                 existingTask.status === 'completed' && task.status !== 'completed') {
+          uniqueTasks.set(taskIdentity, task);
+        }
+      } else {
+        // Première fois qu'on voit cette tâche, l'ajouter
+        uniqueTasks.set(taskIdentity, task);
+      }
+    });
     
-    // Comparer les dates au niveau du jour seulement
-    return taskDate.getTime() === selectedDateTime.getTime();
-  });
+    return Array.from(uniqueTasks.values());
+  }, [tasks, selectedDate]);
 
   // Ajouter les occurrences virtuelles pour les dates futures sélectionnées
   const tasksWithVirtualOccurrences = useMemo(() => {
@@ -331,9 +429,35 @@ export default function ResidentTasksPage() {
     selectedDay.setHours(0, 0, 0, 0);
     
     // Si la date sélectionnée est dans le futur ou aujourd'hui, générer des occurrences virtuelles
+    // mais uniquement pour la date sélectionnée
     if (selectedDay.getTime() >= today.getTime()) {
+      // Ne générer des occurrences virtuelles que si on est sur la date sélectionnée
       const virtualOccurrences = generateFutureOccurrences(tasks, selectedDate || new Date());
-      return [...filteredTasks, ...virtualOccurrences];
+      
+      // Filtrer les occurrences virtuelles pour ne garder que celles qui correspondent à la date sélectionnée
+      // et qui n'ont pas d'équivalent réel (non virtuel) avec la même tâche de base
+      const filteredVirtualOccurrences = virtualOccurrences.filter(virtual => {
+        // Normaliser la date virtuelle pour comparaison
+        const virtualDate = new Date(virtual.dueDate);
+        virtualDate.setHours(0, 0, 0, 0);
+        
+        // Vérifier si cette occurrence virtuelle correspond à la date sélectionnée
+        if (virtualDate.getTime() !== selectedDay.getTime()) {
+          return false;
+        }
+        
+        // Vérifier si une tâche réelle (non virtuelle) équivalente existe déjà
+        // en utilisant le nom et la description comme identifiants
+        const hasRealEquivalent = filteredTasks.some(realTask => 
+          realTask.name === virtual.name && 
+          realTask.description === virtual.description
+        );
+        
+        // Ne garder l'occurrence virtuelle que si elle n'a pas d'équivalent réel
+        return !hasRealEquivalent;
+      });
+      
+      return [...filteredTasks, ...filteredVirtualOccurrences];
     }
     
     return filteredTasks;
@@ -565,21 +689,20 @@ export default function ResidentTasksPage() {
                           </div>
                           {task.recurrenceType !== 'none' && (
                             <span>
-                              {task.recurrenceType === 'custom' ? task.customRecurrence : (
-                                {
-                                  'daily': 'Quotidien',
-                                  'twoDays': 'Tous les 2 jours',
-                                  'threeDays': 'Tous les 3 jours',
-                                  'fourDays': 'Tous les 4 jours',
-                                  'fiveDays': 'Tous les 5 jours',
-                                  'sixDays': 'Tous les 6 jours',
-                                  'weekly': 'Hebdomadaire',
-                                  'twoWeeks': 'Tous les 2 semaines',
-                                  'threeWeeks': 'Tous les 3 semaines',
-                                  'monthly': 'Mensuel',
-                                  'yearly': 'Annuel'
-                                }[task.recurrenceType]
-                              )}
+                              {task.recurrenceType === 'custom' ? task.customRecurrence : 
+                               task.recurrenceType === 'daily' ? 'Quotidien' :
+                               task.recurrenceType === 'twoDays' ? 'Tous les 2 jours' :
+                               task.recurrenceType === 'threeDays' ? 'Tous les 3 jours' :
+                               task.recurrenceType === 'fourDays' ? 'Tous les 4 jours' :
+                               task.recurrenceType === 'fiveDays' ? 'Tous les 5 jours' :
+                               task.recurrenceType === 'sixDays' ? 'Tous les 6 jours' :
+                               task.recurrenceType === 'weekly' ? 'Hebdomadaire' :
+                               task.recurrenceType === 'twoWeeks' ? 'Tous les 2 semaines' :
+                               task.recurrenceType === 'threeWeeks' ? 'Tous les 3 semaines' :
+                               task.recurrenceType === 'monthly' ? 'Mensuel' :
+                               task.recurrenceType === 'yearly' ? 'Annuel' :
+                               task.recurrenceType
+                              }
                             </span>
                           )}
                         </div>
