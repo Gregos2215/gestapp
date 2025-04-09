@@ -30,6 +30,7 @@ interface Task {
   residentName?: string;
   recurrenceType: string;
   customRecurrence?: string;
+  specificDays?: string[];
   completedBy?: {
     id: string;
     name: string;
@@ -168,182 +169,224 @@ export default function ResidentTasksPage() {
 
   // Fonction pour générer les occurrences futures des tâches récurrentes
   const generateFutureOccurrences = (tasks: Task[], targetDate: Date) => {
-    // Normaliser la date cible
-    const normalizedTargetDate = new Date(targetDate);
-    normalizedTargetDate.setHours(0, 0, 0, 0);
-    const targetTimestamp = normalizedTargetDate.getTime();
-    
-    // Résultats et structure pour éviter les doublons
-    const result: Task[] = [];
-    const existingTasksAtTargetDate = new Set();
-    
-    // Identifier les tâches qui existent déjà à la date cible
-    tasks.forEach(task => {
-      const taskDueDate = normalizeDate(task.dueDate);
-      const taskDateOnly = new Date(taskDueDate);
-      taskDateOnly.setHours(0, 0, 0, 0);
+    try {
+      // Normaliser la date cible
+      const normalizedTargetDate = new Date(targetDate);
+      normalizedTargetDate.setHours(0, 0, 0, 0);
+      const targetTimestamp = normalizedTargetDate.getTime();
       
-      if (taskDateOnly.getTime() === targetTimestamp) {
-        // Capturer l'ID de base de la tâche (sans le préfixe virtual pour les occurrences virtuelles)
-        const baseTaskId = task.id.replace(/^virtual-.*-/, '');
-        existingTasksAtTargetDate.add(baseTaskId);
-      }
-    });
-    
-    // Ne considérer que la version la plus récente de chaque tâche récurrente
-    // Créer un Map où la clé est le nom+description de la tâche (identifiant unique)
-    // et la valeur est la tâche avec la date d'échéance la plus récente
-    const latestRecurrentTasks = new Map<string, Task>();
-    
-    // Filtrer d'abord pour ne garder que les tâches récurrentes non virtuelles et non supprimées
-    const allRecurrentTasks = tasks.filter(
-      task => 
-        task.recurrenceType !== 'none' && 
-        !task.isVirtualOccurrence &&
-        !task.deleted
-    );
-    
-    // Organiser les tâches par "identité" (nom+description) et ne garder que la plus récente
-    allRecurrentTasks.forEach(task => {
-      // Créer un identifiant unique pour chaque "lignée" de tâche récurrente
-      const taskIdentity = `${task.name}-${task.description}`;
+      // Résultats et structure pour éviter les doublons
+      const result: Task[] = [];
+      const existingTasksAtTargetDate = new Set();
       
-      // Si cette "lignée" n'existe pas encore dans notre Map, l'ajouter
-      if (!latestRecurrentTasks.has(taskIdentity)) {
-        latestRecurrentTasks.set(taskIdentity, task);
-        return;
-      }
+      // Identifier les tâches qui existent déjà à la date cible
+      tasks.forEach(task => {
+        if (!task.dueDate) return; // Skip if dueDate is undefined
+        
+        const taskDueDate = normalizeDate(task.dueDate);
+        const taskDateOnly = new Date(taskDueDate);
+        taskDateOnly.setHours(0, 0, 0, 0);
+        
+        if (taskDateOnly.getTime() === targetTimestamp) {
+          // Capturer l'ID de base de la tâche (sans le préfixe virtual pour les occurrences virtuelles)
+          const baseTaskId = task.id.replace(/^virtual-.*-/, '');
+          existingTasksAtTargetDate.add(baseTaskId);
+        }
+      });
       
-      // Si elle existe, vérifier si cette tâche est plus récente
-      const existingTask = latestRecurrentTasks.get(taskIdentity)!;
-      const existingDate = normalizeDate(existingTask.dueDate);
-      const currentDate = normalizeDate(task.dueDate);
+      // Ne considérer que la version la plus récente de chaque tâche récurrente
+      // Créer un Map où la clé est le nom+description de la tâche (identifiant unique)
+      // et la valeur est la tâche avec la date d'échéance la plus récente
+      const latestRecurrentTasks = new Map<string, Task>();
       
-      if (currentDate.getTime() > existingDate.getTime()) {
-        // Cette tâche est plus récente, remplacer
-        latestRecurrentTasks.set(taskIdentity, task);
-      }
-    });
-    
-    // Map pour suivre les tâches déjà traitées pour cette date cible
-    const processedTasksForTargetDate = new Map();
-    
-    // Maintenant, utiliser seulement les tâches les plus récentes pour générer les occurrences futures
-    for (const task of latestRecurrentTasks.values()) {
-      // Ne considérer que les tâches non complétées pour générer des occurrences futures
-      if (task.status === 'completed') continue;
+      // Filtrer d'abord pour ne garder que les tâches récurrentes non virtuelles et non supprimées
+      const allRecurrentTasks = tasks.filter(
+        task => 
+          task.recurrenceType !== 'none' && 
+          !task.isVirtualOccurrence &&
+          !task.deleted &&
+          task.dueDate // Ensure dueDate exists
+      );
       
-      // Vérifier si cette tâche existe déjà à la date cible
-      if (existingTasksAtTargetDate.has(task.id)) {
-        continue;
-      }
+      // Organiser les tâches par "identité" (nom+description) et ne garder que la plus récente
+      allRecurrentTasks.forEach(task => {
+        // Créer un identifiant unique pour chaque "lignée" de tâche récurrente
+        const taskIdentity = `${task.name}-${task.description}`;
+        
+        // Si cette "lignée" n'existe pas encore dans notre Map, l'ajouter
+        if (!latestRecurrentTasks.has(taskIdentity)) {
+          latestRecurrentTasks.set(taskIdentity, task);
+          return;
+        }
+        
+        // Si elle existe, vérifier si cette tâche est plus récente
+        const existingTask = latestRecurrentTasks.get(taskIdentity)!;
+        const existingDate = normalizeDate(existingTask.dueDate);
+        const currentDate = normalizeDate(task.dueDate);
+        
+        if (currentDate.getTime() > existingDate.getTime()) {
+          // Cette tâche est plus récente, remplacer
+          latestRecurrentTasks.set(taskIdentity, task);
+        }
+      });
       
-      // Vérifier si cette date est dans la liste des dates à ignorer
-      if (isDateSkipped(task, normalizedTargetDate)) {
-        continue;
-      }
+      // Map pour suivre les tâches déjà traitées pour cette date cible
+      const processedTasksForTargetDate = new Map();
+      
+      // Maintenant, utiliser seulement les tâches les plus récentes pour générer les occurrences futures
+      for (const task of latestRecurrentTasks.values()) {
+        // Ne considérer que les tâches non complétées pour générer des occurrences futures
+        if (task.status === 'completed') continue;
+        
+        // Vérifier si cette tâche existe déjà à la date cible
+        if (existingTasksAtTargetDate.has(task.id)) {
+          continue;
+        }
+        
+        // Vérifier si cette date est dans la liste des dates à ignorer
+        if (isDateSkipped(task, normalizedTargetDate)) {
+          continue;
+        }
 
-      // Vérifier si on a déjà traité une occurrence virtuelle de cette tâche pour cette date
-      const taskKey = `${task.id}-${targetTimestamp}`;
-      if (processedTasksForTargetDate.has(taskKey)) {
-        continue;
-      }
-      
-      // Normaliser la date de la tâche
-      const baseDate = normalizeDate(task.dueDate);
-      
-      // Préserver l'heure exacte
-      const originalHours = baseDate.getHours();
-      const originalMinutes = baseDate.getMinutes();
-      
-      // Convertir à minuit pour la comparaison de dates
-      const baseDateOnly = new Date(baseDate);
-      baseDateOnly.setHours(0, 0, 0, 0);
-      
-      // Si la date de base est déjà future par rapport à la date cible, ne rien faire
-      if (baseDateOnly.getTime() > targetTimestamp) {
-        continue;
-      }
-      
-      // Si la date de base est exactement la date cible, ne rien faire
-      if (baseDateOnly.getTime() === targetTimestamp) {
-        continue;
-      }
-      
-      // Calculer si cette tâche récurrente doit apparaître à la date cible
-      const currentDate = new Date(baseDateOnly);
-      let nextOccurrence = false;
-      
-      while (currentDate.getTime() <= targetTimestamp) {
-        // Calculer la prochaine occurrence
-        switch (task.recurrenceType) {
-          case 'daily':
-            currentDate.setDate(currentDate.getDate() + 1);
-            break;
-          case 'twoDays':
-            currentDate.setDate(currentDate.getDate() + 2);
-            break;
-          case 'threeDays':
-            currentDate.setDate(currentDate.getDate() + 3);
-            break;
-          case 'fourDays':
-            currentDate.setDate(currentDate.getDate() + 4);
-            break;
-          case 'fiveDays':
-            currentDate.setDate(currentDate.getDate() + 5);
-            break;
-          case 'sixDays':
-            currentDate.setDate(currentDate.getDate() + 6);
-            break;
-          case 'weekly':
-            currentDate.setDate(currentDate.getDate() + 7);
-            break;
-          case 'twoWeeks':
-            currentDate.setDate(currentDate.getDate() + 14);
-            break;
-          case 'threeWeeks':
-            currentDate.setDate(currentDate.getDate() + 21);
-            break;
-          case 'monthly':
-            currentDate.setMonth(currentDate.getMonth() + 1);
-            break;
-          case 'yearly':
-            currentDate.setFullYear(currentDate.getFullYear() + 1);
-            break;
+        // Vérifier si on a déjà traité une occurrence virtuelle de cette tâche pour cette date
+        const taskKey = `${task.id}-${targetTimestamp}`;
+        if (processedTasksForTargetDate.has(taskKey)) {
+          continue;
         }
         
-        // Si on atteint exactement la date cible, on devrait ajouter cette occurrence
-        if (currentDate.getTime() === targetTimestamp) {
-          // Mais il faut d'abord vérifier si cette date précise n'est pas ignorée
-          if (!isDateSkipped(task, normalizedTargetDate)) {
-            nextOccurrence = true;
+        // Normaliser la date de la tâche
+        const baseDate = normalizeDate(task.dueDate);
+        
+        // Préserver l'heure exacte
+        const originalHours = baseDate.getHours();
+        const originalMinutes = baseDate.getMinutes();
+        
+        // Convertir à minuit pour la comparaison de dates
+        const baseDateOnly = new Date(baseDate);
+        baseDateOnly.setHours(0, 0, 0, 0);
+        
+        // Si la date de base est déjà future par rapport à la date cible, ne rien faire
+        if (baseDateOnly.getTime() > targetTimestamp) {
+          continue;
+        }
+        
+        // Si la date de base est exactement la date cible, ne rien faire
+        if (baseDateOnly.getTime() === targetTimestamp) {
+          continue;
+        }
+        
+        // Calculer si cette tâche récurrente doit apparaître à la date cible
+        const currentDate = new Date(baseDateOnly);
+        let nextOccurrence = false;
+        
+        // Limiter le nombre d'itérations pour éviter une boucle infinie
+        let iterations = 0;
+        const MAX_ITERATIONS = 500;
+        
+        while (currentDate.getTime() <= targetTimestamp && iterations < MAX_ITERATIONS) {
+          iterations++;
+          
+          // Calculer la prochaine occurrence
+          switch (task.recurrenceType) {
+            case 'daily':
+              currentDate.setDate(currentDate.getDate() + 1);
+              break;
+            case 'twoDays':
+              currentDate.setDate(currentDate.getDate() + 2);
+              break;
+            case 'threeDays':
+              currentDate.setDate(currentDate.getDate() + 3);
+              break;
+            case 'fourDays':
+              currentDate.setDate(currentDate.getDate() + 4);
+              break;
+            case 'fiveDays':
+              currentDate.setDate(currentDate.getDate() + 5);
+              break;
+            case 'sixDays':
+              currentDate.setDate(currentDate.getDate() + 6);
+              break;
+            case 'weekly':
+              currentDate.setDate(currentDate.getDate() + 7);
+              break;
+            case 'twoWeeks':
+              currentDate.setDate(currentDate.getDate() + 14);
+              break;
+            case 'threeWeeks':
+              currentDate.setDate(currentDate.getDate() + 21);
+              break;
+            case 'monthly':
+              currentDate.setMonth(currentDate.getMonth() + 1);
+              break;
+            case 'yearly':
+              currentDate.setFullYear(currentDate.getFullYear() + 1);
+              break;
+            case 'specificDays':
+              if (task.specificDays && task.specificDays.length > 0) {
+                const weekDayMap: { [key: string]: number } = {
+                  'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+                  'thursday': 4, 'friday': 5, 'saturday': 6
+                };
+                
+                // Obtenir le jour actuel et les jours spécifiques en nombres (0-6)
+                const currentDayOfWeek = currentDate.getDay();
+                const selectedDayNumbers = task.specificDays.map(day => weekDayMap[day]);
+                
+                // Trouver le prochain jour valide
+                const futureDays = selectedDayNumbers.filter(day => day > currentDayOfWeek);
+                const daysUntilNext = futureDays.length > 0
+                  ? futureDays[0] - currentDayOfWeek
+                  : 7 - currentDayOfWeek + selectedDayNumbers[0];
+                
+                currentDate.setDate(currentDate.getDate() + daysUntilNext);
+              }
+              break;
+            default:
+              // Type de récurrence non reconnu, sortir de la boucle
+              currentDate.setTime(targetTimestamp + 1);
           }
-          break;
+          
+          // Si on atteint exactement la date cible, on devrait ajouter cette occurrence
+          if (currentDate.getTime() === targetTimestamp) {
+            // Mais il faut d'abord vérifier si cette date précise n'est pas ignorée
+            if (!isDateSkipped(task, normalizedTargetDate)) {
+              nextOccurrence = true;
+            }
+            break;
+          }
+          
+          // Si on a dépassé la date cible ou atteint le nombre max d'itérations, sortir
+          if (currentDate.getTime() > targetTimestamp || iterations >= MAX_ITERATIONS) {
+            break;
+          }
+        }
+        
+        // Ajouter l'occurrence virtuelle si nécessaire
+        if (nextOccurrence) {
+          // Créer la nouvelle date avec l'heure originale
+          const newDate = new Date(normalizedTargetDate);
+          newDate.setHours(originalHours, originalMinutes, 0, 0);
+          
+          const virtualOccurrence: Task = {
+            ...task,
+            id: `virtual-${task.id}-${targetTimestamp}`,
+            dueDate: newDate,
+            status: 'pending',
+            isVirtualOccurrence: true
+          };
+          
+          // Marquer cette tâche comme traitée pour cette date cible
+          processedTasksForTargetDate.set(taskKey, true);
+          
+          result.push(virtualOccurrence);
         }
       }
       
-      // Ajouter l'occurrence virtuelle si nécessaire
-      if (nextOccurrence) {
-        // Créer la nouvelle date avec l'heure originale
-        const newDate = new Date(normalizedTargetDate);
-        newDate.setHours(originalHours, originalMinutes, 0, 0);
-        
-        const virtualOccurrence: Task = {
-          ...task,
-          id: `virtual-${task.id}-${targetTimestamp}`,
-          dueDate: newDate,
-          status: 'pending',
-          isVirtualOccurrence: true
-        };
-        
-        // Marquer cette tâche comme traitée pour cette date cible
-        processedTasksForTargetDate.set(taskKey, true);
-        
-        result.push(virtualOccurrence);
-      }
+      return result;
+    } catch (error) {
+      console.error("Erreur dans generateFutureOccurrences:", error);
+      return []; // En cas d'erreur, retourner un tableau vide au lieu de planter
     }
-    
-    return result;
   };
 
   const filteredTasks = useMemo(() => {
@@ -423,44 +466,49 @@ export default function ResidentTasksPage() {
 
   // Ajouter les occurrences virtuelles pour les dates futures sélectionnées
   const tasksWithVirtualOccurrences = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDay = new Date(selectedDate || new Date());
-    selectedDay.setHours(0, 0, 0, 0);
-    
-    // Si la date sélectionnée est dans le futur ou aujourd'hui, générer des occurrences virtuelles
-    // mais uniquement pour la date sélectionnée
-    if (selectedDay.getTime() >= today.getTime()) {
-      // Ne générer des occurrences virtuelles que si on est sur la date sélectionnée
-      const virtualOccurrences = generateFutureOccurrences(tasks, selectedDate || new Date());
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDay = selectedDate ? new Date(selectedDate) : new Date();
+      selectedDay.setHours(0, 0, 0, 0);
       
-      // Filtrer les occurrences virtuelles pour ne garder que celles qui correspondent à la date sélectionnée
-      // et qui n'ont pas d'équivalent réel (non virtuel) avec la même tâche de base
-      const filteredVirtualOccurrences = virtualOccurrences.filter(virtual => {
-        // Normaliser la date virtuelle pour comparaison
-        const virtualDate = new Date(virtual.dueDate);
-        virtualDate.setHours(0, 0, 0, 0);
+      // Si la date sélectionnée est dans le futur ou aujourd'hui, générer des occurrences virtuelles
+      // mais uniquement pour la date sélectionnée
+      if (selectedDay.getTime() >= today.getTime()) {
+        // Ne générer des occurrences virtuelles que si on est sur la date sélectionnée
+        const virtualOccurrences = generateFutureOccurrences(tasks, selectedDate || new Date());
         
-        // Vérifier si cette occurrence virtuelle correspond à la date sélectionnée
-        if (virtualDate.getTime() !== selectedDay.getTime()) {
-          return false;
-        }
+        // Filtrer les occurrences virtuelles pour ne garder que celles qui correspondent à la date sélectionnée
+        // et qui n'ont pas d'équivalent réel (non virtuel) avec la même tâche de base
+        const filteredVirtualOccurrences = virtualOccurrences.filter(virtual => {
+          // Normaliser la date virtuelle pour comparaison
+          const virtualDate = new Date(virtual.dueDate);
+          virtualDate.setHours(0, 0, 0, 0);
+          
+          // Vérifier si cette occurrence virtuelle correspond à la date sélectionnée
+          if (virtualDate.getTime() !== selectedDay.getTime()) {
+            return false;
+          }
+          
+          // Vérifier si une tâche réelle (non virtuelle) équivalente existe déjà
+          // en utilisant le nom et la description comme identifiants
+          const hasRealEquivalent = filteredTasks.some(realTask => 
+            realTask.name === virtual.name && 
+            realTask.description === virtual.description
+          );
+          
+          // Ne garder l'occurrence virtuelle que si elle n'a pas d'équivalent réel
+          return !hasRealEquivalent;
+        });
         
-        // Vérifier si une tâche réelle (non virtuelle) équivalente existe déjà
-        // en utilisant le nom et la description comme identifiants
-        const hasRealEquivalent = filteredTasks.some(realTask => 
-          realTask.name === virtual.name && 
-          realTask.description === virtual.description
-        );
-        
-        // Ne garder l'occurrence virtuelle que si elle n'a pas d'équivalent réel
-        return !hasRealEquivalent;
-      });
+        return [...filteredTasks, ...filteredVirtualOccurrences];
+      }
       
-      return [...filteredTasks, ...filteredVirtualOccurrences];
+      return filteredTasks;
+    } catch (error) {
+      console.error("Erreur dans le calcul des tâches virtuelles:", error);
+      return filteredTasks || []; // En cas d'erreur, revenir aux tâches filtrées ou à un tableau vide
     }
-    
-    return filteredTasks;
   }, [selectedDate, tasks, filteredTasks]);
 
   const handleCompleteTask = async (taskId: string, isCompleted: boolean) => {
@@ -512,37 +560,57 @@ export default function ResidentTasksPage() {
 
         // Calculer la prochaine date selon le type de récurrence
         switch (taskData.recurrenceType) {
+          case 'specificDays':
+            if (taskData.specificDays && taskData.specificDays.length > 0) {
+              const weekDayMap: { [key: string]: number } = {
+                'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+                'thursday': 4, 'friday': 5, 'saturday': 6
+              };
+              
+              // Obtenir le jour actuel et les jours spécifiques en nombres (0-6)
+              const currentDayOfWeek = nextDate.getDay();
+              const selectedDayNumbers = taskData.specificDays.map(day => weekDayMap[day]);
+              
+              // Trouver le prochain jour valide
+              const futureDays = selectedDayNumbers.filter(day => day > currentDayOfWeek);
+              const daysUntilNext = futureDays.length > 0
+                ? futureDays[0] - currentDayOfWeek
+                : 7 - currentDayOfWeek + selectedDayNumbers[0];
+              
+              nextDate.setDate(nextDate.getDate() + daysUntilNext);
+            }
+            break;
           case 'daily':
             nextDate.setDate(nextDate.getDate() + 1);
             break;
           case 'twoDays':
             nextDate.setDate(nextDate.getDate() + 2);
             break;
-          case 'threeDays':
+            case 'threeDays':
             nextDate.setDate(nextDate.getDate() + 3);
             break;
-          case 'fourDays':
+            case 'fourDays':
             nextDate.setDate(nextDate.getDate() + 4);
             break;
-          case 'fiveDays':
+            case 'fiveDays':
             nextDate.setDate(nextDate.getDate() + 5);
             break;
-          case 'sixDays':
+            case 'sixDays':
             nextDate.setDate(nextDate.getDate() + 6);
             break;
-          case 'weekly':
+            case 'weekly':
             nextDate.setDate(nextDate.getDate() + 7);
             break;
-          case 'twoWeeks':
+            case 'twoWeeks':
             nextDate.setDate(nextDate.getDate() + 14);
             break;
-          case 'threeWeeks':
+            case 'threeWeeks':
             nextDate.setDate(nextDate.getDate() + 21);
             break;
-          case 'monthly':
+            case 'monthly':
             nextDate.setMonth(nextDate.getMonth() + 1);
             break;
-          case 'yearly':
+            case 'yearly':
             nextDate.setFullYear(nextDate.getFullYear() + 1);
             break;
         }
@@ -628,7 +696,7 @@ export default function ResidentTasksPage() {
                 selected={selectedDate}
                 onChange={(date: Date | null) => setSelectedDate(date)}
                 dateFormat="dd/MM/yyyy"
-                locale="fr"
+                locale={fr}
                 placeholderText="Filtrer par date"
                 className="w-full sm:w-auto px-4 py-2 pr-10 text-sm border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-600 text-gray-700"
                 customInput={
@@ -701,6 +769,7 @@ export default function ResidentTasksPage() {
                                task.recurrenceType === 'threeWeeks' ? 'Tous les 3 semaines' :
                                task.recurrenceType === 'monthly' ? 'Mensuel' :
                                task.recurrenceType === 'yearly' ? 'Annuel' :
+                               task.recurrenceType === 'specificDays' ? 'Jours spécifiques' :
                                task.recurrenceType
                               }
                             </span>
