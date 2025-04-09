@@ -139,11 +139,39 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
         timestamp: serverTimestamp()
       };
 
+      // Ajuster la date en fonction des jours spécifiques sélectionnés
+      let adjustedDueDate = new Date(`${dueDate.toISOString().split('T')[0]}T${dueTime.toISOString().split('T')[1]}`);
+      
+      if (recurrenceType === 'specificDays' && selectedDays.length > 0) {
+        const weekDayMap: { [key: string]: number } = {
+          'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+          'thursday': 4, 'friday': 5, 'saturday': 6
+        };
+        
+        // Obtenir le jour de la semaine de la date sélectionnée (0-6)
+        const selectedDayOfWeek = adjustedDueDate.getDay();
+        
+        // Convertir selectedDays en nombres de jours (0-6)
+        const selectedDayNumbers = selectedDays.map(day => weekDayMap[day]);
+        
+        // Si le jour sélectionné n'est pas dans les jours spécifiques,
+        // trouver le prochain jour valide
+        if (!selectedDayNumbers.includes(selectedDayOfWeek)) {
+          // Trier les jours pour trouver le prochain jour valide
+          const futureDays = selectedDayNumbers.filter(day => day > selectedDayOfWeek);
+          const daysUntilNext = futureDays.length > 0
+            ? futureDays[0] - selectedDayOfWeek
+            : 7 - selectedDayOfWeek + selectedDayNumbers[0];
+            
+          adjustedDueDate.setDate(adjustedDueDate.getDate() + daysUntilNext);
+        }
+      }
+
       const taskData = {
         type: taskType,
         name: taskName,
         description,
-        dueDate: new Date(`${dueDate.toISOString().split('T')[0]}T${dueTime.toISOString().split('T')[1]}`),
+        dueDate: adjustedDueDate,
         recurrenceType,
         status: 'pending',
         centerCode,
