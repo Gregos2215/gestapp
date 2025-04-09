@@ -87,6 +87,11 @@ interface Task {
     name: string;
     timestamp: Timestamp;
   };
+  completedBy?: {
+    id: string;
+    name: string;
+    timestamp: Timestamp;
+  };
   specificDays?: string[]; // Liste des jours spécifiques où la tâche doit être répétée
 }
 
@@ -997,11 +1002,31 @@ export default function DashboardPage() {
         if (taskData && taskData.recurrenceType !== 'none') {
           const currentDate = taskData.dueDate instanceof Date 
             ? taskData.dueDate 
-            : (taskData.dueDate as any).toDate();
+            : (taskData.dueDate as { toDate(): Date }).toDate();
           const nextDate = new Date(currentDate);
 
           // Calculer la prochaine date selon le type de récurrence
           switch (taskData.recurrenceType) {
+            case 'specificDays':
+              if (taskData.specificDays && taskData.specificDays.length > 0) {
+                const weekDayMap: { [key: string]: number } = {
+                  'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+                  'thursday': 4, 'friday': 5, 'saturday': 6
+                };
+                
+                // Obtenir le jour actuel et les jours spécifiques en nombres (0-6)
+                const currentDayOfWeek = nextDate.getDay();
+                const selectedDayNumbers = taskData.specificDays.map(day => weekDayMap[day]);
+                
+                // Trouver le prochain jour valide
+                const futureDays = selectedDayNumbers.filter(day => day > currentDayOfWeek);
+                const daysUntilNext = futureDays.length > 0
+                  ? futureDays[0] - currentDayOfWeek
+                  : 7 - currentDayOfWeek + selectedDayNumbers[0];
+                
+                nextDate.setDate(nextDate.getDate() + daysUntilNext);
+              }
+              break;
             case 'daily':
               nextDate.setDate(nextDate.getDate() + 1);
               break;
