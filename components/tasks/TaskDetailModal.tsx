@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { doc, updateDoc, deleteDoc, Timestamp, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, Timestamp, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import toast from 'react-hot-toast';
 
@@ -319,6 +319,27 @@ export default function TaskDetailModal({
         console.log(`Tâche ${task.id} supprimée de la base de données`);
         toast.success('Tâche supprimée avec succès');
       }
+      
+      // --- AJOUT : Supprimer les alertes associées --- 
+      try {
+        const alertsRef = collection(db, 'alerts');
+        // Utiliser parentTaskId car les alertes sont probablement liées à la tâche racine
+        const alertsQuery = query(
+          alertsRef,
+          where('type', '==', 'task_overdue'), 
+          where('relatedId', '==', parentTaskId)
+        );
+
+        const alertsSnapshot = await getDocs(alertsQuery);
+        const deletePromises = alertsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        console.log(`Alertes associées à la tâche ${parentTaskId} supprimées.`);
+
+      } catch (alertError) {
+        console.error("Erreur lors de la suppression des alertes associées:", alertError);
+        // Ne pas bloquer l'utilisateur si la suppression des alertes échoue, mais enregistrer l'erreur
+      }
+      // --- FIN AJOUT ---
       
       // Fermer la modale de confirmation
       setShowDeleteConfirmation(false);
