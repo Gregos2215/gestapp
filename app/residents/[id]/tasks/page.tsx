@@ -110,11 +110,13 @@ export default function ResidentTasksPage() {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const tasksData: Task[] = [];
       querySnapshot.forEach((doc) => {
-        const { status: _status, completedBy: _completedBy, id: _docId, ...rest } = doc.data();
+        const data = doc.data();
         const taskData = {
-          ...rest,
+          ...data,
           id: doc.id,
-          dueDate: rest.dueDate?.toDate() || new Date(),
+          dueDate: data.dueDate?.toDate() || new Date(),
+          status: data.status || 'pending',
+          completedBy: data.completedBy || null
         };
         
         tasksData.push(taskData as Task);
@@ -420,13 +422,10 @@ export default function ResidentTasksPage() {
       if (a.isVirtualOccurrence && !b.isVirtualOccurrence) return 1;
       if (!a.isVirtualOccurrence && b.isVirtualOccurrence) return -1;
       
-      // Pour deux tâches réelles, prioriser celle qui n'est pas complétée
-      if (!a.isVirtualOccurrence && !b.isVirtualOccurrence) {
-        if (a.status === 'completed' && b.status !== 'completed') return 1;
-        if (a.status !== 'completed' && b.status === 'completed') return -1;
-      }
+      // Pour deux tâches réelles, nous ne priorisons plus le statut
+      // car nous voulons montrer les tâches complétées aussi
       
-      // Si les deux sont virtuelles ou les deux sont réelles avec le même statut,
+      // Si les deux sont virtuelles ou les deux sont réelles,
       // trier par date de création (si disponible)
       if (a.createdBy?.timestamp && b.createdBy?.timestamp) {
         const dateA = a.createdBy.timestamp.toDate ? a.createdBy.timestamp.toDate() : new Date();
@@ -442,22 +441,30 @@ export default function ResidentTasksPage() {
       // Créer un identifiant unique basé sur le nom et la description
       const taskIdentity = `${task.name}-${task.description}`;
       
-      // Ne pas remplacer si on a déjà une version non virtuelle de cette tâche
-      if (uniqueTasks.has(taskIdentity)) {
-        const existingTask = uniqueTasks.get(taskIdentity)!;
-        
-        // Si l'existante est virtuelle et celle-ci ne l'est pas, remplacer
-        if (existingTask.isVirtualOccurrence && !task.isVirtualOccurrence) {
+      // Si la tâche est complétée, nous voulons la garder
+      if (task.status === 'completed') {
+        if (!uniqueTasks.has(taskIdentity) || uniqueTasks.get(taskIdentity)?.status !== 'completed') {
           uniqueTasks.set(taskIdentity, task);
         }
-        // Si les deux sont non virtuelles mais celle-ci n'est pas complétée, remplacer
-        else if (!existingTask.isVirtualOccurrence && !task.isVirtualOccurrence && 
-                 existingTask.status === 'completed' && task.status !== 'completed') {
+      }
+      // Si la tâche n'est pas complétée
+      else {
+        // Ne pas remplacer si on a déjà une version non virtuelle de cette tâche
+        if (uniqueTasks.has(taskIdentity)) {
+          const existingTask = uniqueTasks.get(taskIdentity)!;
+          
+          // Si l'existante est virtuelle et celle-ci ne l'est pas, remplacer
+          if (existingTask.isVirtualOccurrence && !task.isVirtualOccurrence) {
+            uniqueTasks.set(taskIdentity, task);
+          }
+          // Si les deux sont virtuelles ou les deux sont réelles, garder celle qui n'est pas complétée
+          else if (existingTask.status === 'completed') {
+            uniqueTasks.set(taskIdentity, task);
+          }
+        } else {
+          // Première fois qu'on voit cette tâche, l'ajouter
           uniqueTasks.set(taskIdentity, task);
         }
-      } else {
-        // Première fois qu'on voit cette tâche, l'ajouter
-        uniqueTasks.set(taskIdentity, task);
       }
     });
     
@@ -504,6 +511,8 @@ export default function ResidentTasksPage() {
         return [...filteredTasks, ...filteredVirtualOccurrences];
       }
       
+      // Pour les dates passées, il faut également chercher les tâches réelles
+      // complétées dans la collection, pas seulement celles déjà chargées
       return filteredTasks;
     } catch (error) {
       console.error("Erreur dans le calcul des tâches virtuelles:", error);
@@ -551,7 +560,7 @@ export default function ResidentTasksPage() {
       const deletePromises = alertsSnapshot.docs.map(doc => deleteDoc(doc.ref));
       await Promise.all(deletePromises);
 
-      // Créer la prochaine occurrence si la tâche est récurrente
+      // Vérifier s'il existe déjà une tâche récurrente pour la prochaine date
       if (taskData && taskData.recurrenceType !== 'none') {
         const currentDate = taskData.dueDate instanceof Date 
           ? taskData.dueDate 
@@ -567,11 +576,9 @@ export default function ResidentTasksPage() {
                 'thursday': 4, 'friday': 5, 'saturday': 6
               };
               
-              // Obtenir le jour actuel et les jours spécifiques en nombres (0-6)
               const currentDayOfWeek = nextDate.getDay();
               const selectedDayNumbers = taskData.specificDays.map(day => weekDayMap[day]);
               
-              // Trouver le prochain jour valide
               const futureDays = selectedDayNumbers.filter(day => day > currentDayOfWeek);
               const daysUntilNext = futureDays.length > 0
                 ? futureDays[0] - currentDayOfWeek
@@ -586,47 +593,66 @@ export default function ResidentTasksPage() {
           case 'twoDays':
             nextDate.setDate(nextDate.getDate() + 2);
             break;
-            case 'threeDays':
+          case 'threeDays':
             nextDate.setDate(nextDate.getDate() + 3);
             break;
-            case 'fourDays':
+          case 'fourDays':
             nextDate.setDate(nextDate.getDate() + 4);
             break;
-            case 'fiveDays':
+          case 'fiveDays':
             nextDate.setDate(nextDate.getDate() + 5);
             break;
-            case 'sixDays':
+          case 'sixDays':
             nextDate.setDate(nextDate.getDate() + 6);
             break;
-            case 'weekly':
+          case 'weekly':
             nextDate.setDate(nextDate.getDate() + 7);
             break;
-            case 'twoWeeks':
+          case 'twoWeeks':
             nextDate.setDate(nextDate.getDate() + 14);
             break;
-            case 'threeWeeks':
+          case 'threeWeeks':
             nextDate.setDate(nextDate.getDate() + 21);
             break;
-            case 'monthly':
+          case 'monthly':
             nextDate.setMonth(nextDate.getMonth() + 1);
             break;
-            case 'yearly':
+          case 'yearly':
             nextDate.setFullYear(nextDate.getFullYear() + 1);
             break;
         }
 
-        // Créer la nouvelle tâche récurrente
-        const { id, completedBy, status, ...taskDataWithoutStatus } = taskData;
-        const newTaskData = {
-          ...taskDataWithoutStatus,
-          dueDate: Timestamp.fromDate(nextDate),
-          status: 'pending' as const,
-          completedBy: null,
-          createdAt: serverTimestamp(),
-          deleted: false
-        };
-        
-        await addDoc(collection(db, 'tasks'), newTaskData);
+        // Vérifier s'il existe déjà une tâche pour la prochaine date
+        const nextDayStart = new Date(nextDate);
+        nextDayStart.setHours(0, 0, 0, 0);
+        const nextDayEnd = new Date(nextDate);
+        nextDayEnd.setHours(23, 59, 59, 999);
+
+        const existingTaskQuery = query(
+          collection(db, 'tasks'),
+          where('name', '==', taskData.name),
+          where('description', '==', taskData.description),
+          where('dueDate', '>=', Timestamp.fromDate(nextDayStart)),
+          where('dueDate', '<=', Timestamp.fromDate(nextDayEnd)),
+          where('deleted', '!=', true)
+        );
+
+        const existingTaskSnapshot = await getDocs(existingTaskQuery);
+
+        // Ne créer une nouvelle tâche que s'il n'en existe pas déjà une pour cette date
+        if (existingTaskSnapshot.empty) {
+          const { id, completedBy, status, ...taskDataWithoutStatus } = taskData;
+          const newTaskData = {
+            ...taskDataWithoutStatus,
+            dueDate: Timestamp.fromDate(nextDate),
+            status: 'pending' as const,
+            completedBy: null,
+            createdAt: serverTimestamp(),
+            deleted: false
+          };
+          
+          await addDoc(collection(db, 'tasks'), newTaskData);
+        }
       }
 
       // Fermer la modale de confirmation
@@ -638,7 +664,6 @@ export default function ResidentTasksPage() {
       console.error('Error updating task status:', error);
       toast.error('Erreur lors de la mise à jour du statut de la tâche');
       
-      // Fermer la modale en cas d'erreur aussi
       setIsConfirmCompleteModalOpen(false);
       setTaskToComplete(null);
     }

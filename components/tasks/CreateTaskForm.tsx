@@ -139,9 +139,16 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
         timestamp: serverTimestamp()
       };
 
-      // Ajuster la date en fonction des jours spécifiques sélectionnés
-      let adjustedDueDate = new Date(`${dueDate.toISOString().split('T')[0]}T${dueTime.toISOString().split('T')[1]}`);
+      // Combiner la date et l'heure correctement
+      let adjustedDueDate = new Date(dueDate);
+      adjustedDueDate.setHours(
+        dueTime.getHours(),
+        dueTime.getMinutes(),
+        0,
+        0
+      );
       
+      // N'ajuster la date que pour le type de récurrence 'specificDays'
       if (recurrenceType === 'specificDays' && selectedDays.length > 0) {
         const weekDayMap: { [key: string]: number } = {
           'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
