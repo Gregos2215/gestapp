@@ -251,6 +251,18 @@ export default function TaskDetailModal({
           status: 'pending'
         });
         
+        // Supprimer les alertes associées à cette tâche
+        const alertsRef = collection(db, 'alerts');
+        const alertsQuery = query(
+          alertsRef,
+          where('type', '==', 'task_overdue'),
+          where('relatedId', '==', parentTaskId)
+        );
+        
+        const alertsSnapshot = await getDocs(alertsQuery);
+        const deletePromises = alertsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        
         console.log(`Tâche récurrente ${parentTaskId} marquée comme supprimée`);
         toast.success('Toutes les occurrences futures ont été supprimées');
       } else if (task.recurrenceType !== 'none' && deleteOption === 'single') {
@@ -306,6 +318,19 @@ export default function TaskDetailModal({
         } else if (!isVirtual) {
           // Si la tâche parent n'existe pas et n'est pas virtuelle, supprimer la tâche entière
           await deleteDoc(taskRef);
+          
+          // Supprimer les alertes associées à cette tâche
+          const alertsRefSingle = collection(db, 'alerts');
+          const alertsQuerySingle = query(
+            alertsRefSingle,
+            where('type', '==', 'task_overdue'),
+            where('relatedId', '==', task.id)
+          );
+          
+          const alertsSnapshotSingle = await getDocs(alertsQuerySingle);
+          const deletePromisesSingle = alertsSnapshotSingle.docs.map(doc => deleteDoc(doc.ref));
+          await Promise.all(deletePromisesSingle);
+          
           console.log(`Tâche ${task.id} supprimée de la base de données`);
           toast.success('Tâche supprimée avec succès');
         } else {
@@ -316,30 +341,22 @@ export default function TaskDetailModal({
       } else {
         // Pour une tâche non récurrente, supprimer entièrement la tâche
         await deleteDoc(taskRef);
+        
+        // Supprimer les alertes associées à cette tâche
+        const alertsRefNonRecurrent = collection(db, 'alerts');
+        const alertsQueryNonRecurrent = query(
+          alertsRefNonRecurrent,
+          where('type', '==', 'task_overdue'),
+          where('relatedId', '==', task.id)
+        );
+        
+        const alertsSnapshotNonRecurrent = await getDocs(alertsQueryNonRecurrent);
+        const deletePromisesNonRecurrent = alertsSnapshotNonRecurrent.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromisesNonRecurrent);
+        
         console.log(`Tâche ${task.id} supprimée de la base de données`);
         toast.success('Tâche supprimée avec succès');
       }
-      
-      // --- AJOUT : Supprimer les alertes associées --- 
-      try {
-        const alertsRef = collection(db, 'alerts');
-        // Utiliser parentTaskId car les alertes sont probablement liées à la tâche racine
-        const alertsQuery = query(
-          alertsRef,
-          where('type', '==', 'task_overdue'), 
-          where('relatedId', '==', parentTaskId)
-        );
-
-        const alertsSnapshot = await getDocs(alertsQuery);
-        const deletePromises = alertsSnapshot.docs.map(doc => deleteDoc(doc.ref));
-        await Promise.all(deletePromises);
-        console.log(`Alertes associées à la tâche ${parentTaskId} supprimées.`);
-
-      } catch (alertError) {
-        console.error("Erreur lors de la suppression des alertes associées:", alertError);
-        // Ne pas bloquer l'utilisateur si la suppression des alertes échoue, mais enregistrer l'erreur
-      }
-      // --- FIN AJOUT ---
       
       // Fermer la modale de confirmation
       setShowDeleteConfirmation(false);

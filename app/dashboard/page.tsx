@@ -2153,27 +2153,66 @@ export default function DashboardPage() {
 
     console.log('[loadAlerts] Requête créée sans filtre de date');
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
       console.log('[loadAlerts] Snapshot reçu, nombre de documents:', querySnapshot.size);
       
-      const alertsData: Alert[] = [];
+      // Collecte des alertes de base
+      const tempAlertsData: Alert[] = [];
+      const taskAlerts: { alert: Alert; taskId: string }[] = [];
+      
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         console.log('[loadAlerts] Alerte trouvée:', doc.id, 'type:', data.type, 'excludedUsers:', data.excludedUsers);
         
         // N'ajouter l'alerte que si l'utilisateur n'est pas dans la liste des exclus
         if (!data.excludedUsers?.includes(customUser?.uid)) {
-          alertsData.push({
+          const alertData = {
             id: doc.id,
             ...data
-          } as Alert);
+          } as Alert;
+          
+          // Pour les alertes liées à des tâches, ajouter à une liste à vérifier
+          if (data.type === 'task_overdue' && data.relatedId) {
+            taskAlerts.push({ alert: alertData, taskId: data.relatedId });
+          } else {
+            // Les autres types d'alertes sont ajoutés directement
+            tempAlertsData.push(alertData);
+          }
         } else {
           console.log('[loadAlerts] Alerte exclue pour l\'utilisateur:', doc.id);
         }
       });
       
-      console.log('[loadAlerts] Alertes chargées:', alertsData.length);
-      setAlerts(alertsData);
+      // Pour les alertes liées à des tâches, vérifier si les tâches existent et ne sont pas supprimées
+      const finalAlertsData = [...tempAlertsData];
+      
+      for (const { alert, taskId } of taskAlerts) {
+        try {
+          const taskRef = doc(db, 'tasks', taskId);
+          const taskDoc = await getDoc(taskRef);
+          
+          // N'ajouter l'alerte que si la tâche existe et n'est pas marquée comme supprimée
+          if (taskDoc.exists()) {
+            const taskData = taskDoc.data();
+            if (!taskData.deleted) {
+              finalAlertsData.push(alert);
+            } else {
+              console.log(`[loadAlerts] Alerte ${alert.id} ignorée car la tâche ${taskId} est marquée comme supprimée`);
+              // Supprimer automatiquement l'alerte pour nettoyer la base de données
+              await deleteDoc(doc(db, 'alerts', alert.id));
+            }
+          } else {
+            console.log(`[loadAlerts] Alerte ${alert.id} ignorée car la tâche ${taskId} n'existe pas`);
+            // Supprimer automatiquement l'alerte pour nettoyer la base de données
+            await deleteDoc(doc(db, 'alerts', alert.id));
+          }
+        } catch (error) {
+          console.error(`[loadAlerts] Erreur lors de la vérification de la tâche ${taskId}:`, error);
+        }
+      }
+      
+      console.log('[loadAlerts] Alertes validées et chargées:', finalAlertsData.length);
+      setAlerts(finalAlertsData);
     }, (error) => {
       console.error('[loadAlerts] Erreur lors du chargement des alertes:', error);
     });
