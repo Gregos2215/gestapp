@@ -3365,6 +3365,7 @@ export default function DashboardPage() {
                     prevReports.filter(r => r.id !== selectedReport.id)
                   );
                   setSelectedReport(null);
+                  setIsReportDetailModalOpen(false); // Explicitly close modal after state update
                 }}
               />
             )}
@@ -3596,6 +3597,8 @@ export default function DashboardPage() {
                                     try {
                                       await deleteDoc(doc(db, 'messages', message.id));
                                       toast.success('Message supprimé');
+                                      // Update local state to remove the message from the list
+                                      setMessages(prevMessages => prevMessages.filter(m => m.id !== message.id));
                                     } catch (error) {
                                       console.error('Erreur lors de la suppression du message:', error);
                                       toast.error('Erreur lors de la suppression du message');

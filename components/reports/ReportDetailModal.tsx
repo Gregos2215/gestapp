@@ -58,16 +58,12 @@ export default function ReportDetailModal({
         // Ajouter un nouvel état pour maintenir la modale dans l'historique
         window.history.pushState({ modal: 'reportDetail' }, '', window.location.href);
       } 
-      // Si la confirmation de suppression est active, fermer cette boîte de dialogue
+      // Sinon, fermer la modale
       else if (showDeleteConfirmation) {
         setShowDeleteConfirmation(false);
-        // Ajouter un nouvel état pour maintenir la modale dans l'historique
         window.history.pushState({ modal: 'reportDetail' }, '', window.location.href);
-      } 
-      // Sinon, fermer la modale
-      else {
+      } else {
         onClose();
-        // Ne pas appeler window.history.back() ici
       }
     };
 
@@ -79,6 +75,12 @@ export default function ReportDetailModal({
       window.removeEventListener('popstate', handlePopState);
     };
   }, [isOpen, onClose, isEditing, showDeleteConfirmation]);
+
+  useEffect(() => {
+    if (report) {
+      setEditedContent(report.content);
+    }
+  }, [report]);
 
   const handleSave = async () => {
     if (!editedContent.trim()) {
@@ -101,17 +103,17 @@ export default function ReportDetailModal({
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteReport = async () => {
     if (!canDelete) return;
     
     setIsDeleting(true);
     try {
       await deleteDoc(doc(db, 'reports', report.id));
       toast.success('Rapport supprimé avec succès');
-      
-      onClose();
+      setShowDeleteConfirmation(false); // Fermer la modale de confirmation
+      onClose(); // Fermer la modale principale
       if (onReportDeleted) {
-        onReportDeleted();
+        onReportDeleted(); // Appeler le callback pour mettre à jour la liste
       }
     } catch (error) {
       console.error('Error deleting report:', error);
@@ -124,7 +126,11 @@ export default function ReportDetailModal({
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={() => {
+        if (isEditing) setIsEditing(false);
+        if (showDeleteConfirmation) setShowDeleteConfirmation(false);
+        onClose();
+      }}>
         <div className="fixed inset-0 bg-gray-500/75 backdrop-blur-sm transition-opacity" />
 
         <div className="fixed inset-0 z-10 overflow-y-auto">
@@ -138,7 +144,11 @@ export default function ReportDetailModal({
                   <button
                     type="button"
                     className="rounded-md bg-indigo-600/50 text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-white p-1.5"
-                    onClick={onClose}
+                    onClick={() => {
+                      if (isEditing) setIsEditing(false);
+                      if (showDeleteConfirmation) setShowDeleteConfirmation(false);
+                      onClose();
+                    }}
                   >
                     <span className="sr-only">Fermer</span>
                     <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
@@ -155,7 +165,7 @@ export default function ReportDetailModal({
                   <div>
                     <h4 className="text-xs sm:text-sm font-medium text-gray-500">Date de création</h4>
                     <p className="mt-1 text-base sm:text-lg font-semibold text-gray-900">
-                      {format(report.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr })}
+                      {report.createdAt && report.createdAt.toDate ? format(report.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Date inconnue'}
                     </p>
                   </div>
                   <div>
@@ -205,7 +215,7 @@ export default function ReportDetailModal({
                   </button>
                 )}
                 
-                <div className="flex justify-end gap-2 sm:gap-3 ml-auto w-full sm:w-auto">
+                <div className={`flex ${canDelete && !isEditing ? 'justify-end' : 'justify-end w-full'} gap-2 sm:gap-3 ${canDelete && !isEditing ? '' : 'ml-auto'} w-full sm:w-auto`}>
                   {isEditing ? (
                     <>
                       <button
@@ -229,7 +239,10 @@ export default function ReportDetailModal({
                   ) : (
                     <button
                       type="button"
-                      onClick={onClose}
+                      onClick={() => {
+                        if (showDeleteConfirmation) setShowDeleteConfirmation(false);
+                        onClose();
+                      }}
                       className="w-full sm:w-auto px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
                       Fermer
@@ -242,21 +255,21 @@ export default function ReportDetailModal({
         </div>
 
         {showDeleteConfirmation && (
-          <div className="fixed inset-0 z-60 overflow-y-auto">
+          <div className="fixed inset-0 z-[60] overflow-y-auto"> {/* Augmenter le z-index ici */}
             <div className="flex items-center justify-center min-h-screen px-2 sm:px-4 pt-4 pb-20 text-center">
-              <div className="fixed inset-0 transition-opacity" onClick={() => setShowDeleteConfirmation(false)}>
+              <div className="fixed inset-0 transition-opacity" onClick={() => setShowDeleteConfirmation(false)} aria-hidden="true">
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
-              <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all w-full max-w-[95vw] sm:max-w-lg">
+              <Dialog.Panel className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all w-full max-w-[95vw] sm:max-w-lg relative z-[70]"> {/* Assurer que la Dialog.Panel est au-dessus */}
                 <div className="bg-white px-3 sm:px-4 pt-4 sm:pt-5 pb-3 sm:pb-4">
                   <div className="sm:flex sm:items-start">
                     <div className="mx-auto flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
                       <TrashIcon className="h-5 w-5 text-red-600" aria-hidden="true" />
                     </div>
                     <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                      <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900">
+                      <Dialog.Title as="h3" className="text-base sm:text-lg leading-6 font-medium text-gray-900">
                         Confirmation de suppression
-                      </h3>
+                      </Dialog.Title>
                       <div className="mt-2">
                         <p className="text-xs sm:text-sm text-gray-500">
                           Êtes-vous sûr de vouloir supprimer ce rapport ? Cette action est irréversible.
@@ -269,7 +282,7 @@ export default function ReportDetailModal({
                   <button
                     type="button"
                     className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-xs sm:text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto"
-                    onClick={handleDelete}
+                    onClick={handleDeleteReport}
                     disabled={isDeleting}
                   >
                     {isDeleting ? 'Suppression...' : 'Supprimer'}
@@ -282,7 +295,7 @@ export default function ReportDetailModal({
                     Annuler
                   </button>
                 </div>
-              </div>
+              </Dialog.Panel>
             </div>
           </div>
         )}

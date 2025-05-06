@@ -25,6 +25,7 @@ interface MessageDetailModalProps {
   message: Message;
   currentUserId: string; // Ajout de l'ID de l'utilisateur actuel
   isEmployer: boolean; // Ajout du statut employeur de l'utilisateur actuel
+  onMessageDeleted?: () => void; // Callback pour la suppression
 }
 
 // Fonction utilitaire pour gérer les dates Firebase de manière sécurisée (répliquée ici pour l'instant)
@@ -40,7 +41,7 @@ const safeFirebaseDate = (firebaseDate: any): Date | null => {
   return null;
 };
 
-export default function MessageDetailModal({ isOpen, onClose, message, currentUserId, isEmployer }: MessageDetailModalProps) {
+export default function MessageDetailModal({ isOpen, onClose, message, currentUserId, isEmployer, onMessageDeleted }: MessageDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(message.title);
   const [editedContent, setEditedContent] = useState(message.content);
@@ -48,16 +49,15 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
-  // Vérifier si l'utilisateur peut modifier ou supprimer le message
+  // Vérifier si l'utilisateur peut modifier le message
   const canEdit = isEmployer || currentUserId === message.author.id;
-  const canDelete = isEmployer;
+  const canDelete = isEmployer; // Seul l'employeur peut supprimer
 
   // Réinitialiser les états quand le message change
   useEffect(() => {
     setEditedTitle(message.title);
     setEditedContent(message.content);
     setIsEditing(false);
-    setShowDeleteConfirmation(false);
   }, [message]);
 
   const formattedDate = safeFirebaseDate(message.createdAt)
@@ -79,16 +79,12 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
         // Ajouter un nouvel état pour maintenir la modale dans l'historique
         window.history.pushState({ modal: 'messageDetail' }, '', window.location.href);
       } 
-      // Si la confirmation de suppression est active, fermer cette boîte de dialogue
+      // Sinon, fermer la modale
       else if (showDeleteConfirmation) {
         setShowDeleteConfirmation(false);
-        // Ajouter un nouvel état pour maintenir la modale dans l'historique
         window.history.pushState({ modal: 'messageDetail' }, '', window.location.href);
-      } 
-      // Sinon, fermer la modale
-      else {
+      } else {
         onClose();
-        // Ne pas appeler window.history.back() ici
       }
     };
 
@@ -104,8 +100,8 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
   // Fonction pour sauvegarder les modifications
   const handleSave = async () => {
     // Vérifier si le contenu n'est pas vide
-    if (!editedContent.trim()) {
-      toast.error('Le contenu du message ne peut pas être vide');
+    if (!editedContent.trim() && !editedTitle.trim()) {
+      toast.error('Le titre ou le contenu du message ne peut pas être vide');
       return;
     }
 
@@ -125,15 +121,18 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
     }
   };
 
-  // Fonction pour supprimer le message
-  const handleDelete = async () => {
+  const handleDeleteMessage = async () => {
     if (!canDelete) return;
     
     setIsDeleting(true);
     try {
       await deleteDoc(doc(db, 'messages', message.id));
       toast.success('Message supprimé avec succès');
-      onClose();
+      setShowDeleteConfirmation(false);
+      onClose(); 
+      if (onMessageDeleted) {
+        onMessageDeleted();
+      }
     } catch (error) {
       console.error('Erreur lors de la suppression du message:', error);
       toast.error('Erreur lors de la suppression du message');
@@ -145,7 +144,11 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={() => {
+        if (isEditing) setIsEditing(false);
+        if (showDeleteConfirmation) setShowDeleteConfirmation(false);
+        onClose();
+      }}>
         {/* Backdrop */}
         <Transition.Child
           as={Fragment}
@@ -187,6 +190,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                           setEditedTitle(message.title);
                           setEditedContent(message.content);
                         } else {
+                          if (showDeleteConfirmation) setShowDeleteConfirmation(false);
                           onClose();
                         }
                       }}
@@ -244,8 +248,6 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                           type="button"
                           onClick={() => {
                             setIsEditing(true);
-                            setEditedTitle(message.title);
-                            setEditedContent(message.content);
                           }}
                           className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium text-indigo-600 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-lg"
                         >
@@ -287,15 +289,13 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                     </button>
                   )}
                   
-                  <div className="flex justify-end gap-2 sm:gap-3 ml-auto w-full sm:w-auto">
+                  <div className={`flex ${canDelete && !isEditing ? 'justify-end' : 'justify-end w-full'} gap-2 sm:gap-3 ${canDelete && !isEditing ? '' : 'ml-auto'} w-full sm:w-auto`}>
                     {isEditing ? (
                       <>
                         <button
                           type="button"
                           onClick={() => {
                             setIsEditing(false);
-                            setEditedTitle(message.title);
-                            setEditedContent(message.content);
                           }}
                           className="flex-1 sm:flex-none px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                         >
@@ -304,9 +304,9 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                         <button
                           type="button"
                           onClick={handleSave}
-                          disabled={isSaving || !editedContent.trim()}
+                          disabled={isSaving || (!editedTitle.trim() && !editedContent.trim())}
                           className={`flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                            (isSaving || !editedContent.trim()) && 'opacity-50 cursor-not-allowed'
+                            (isSaving || (!editedTitle.trim() && !editedContent.trim())) && 'opacity-50 cursor-not-allowed'
                           }`}
                         >
                           {isSaving ? 'Enregistrement...' : 'Enregistrer'}
@@ -315,7 +315,10 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                     ) : (
                       <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => {
+                          if (showDeleteConfirmation) setShowDeleteConfirmation(false);
+                          onClose();
+                        }}
                         className="w-full sm:w-auto px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
                         Fermer
@@ -328,49 +331,69 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
           </div>
         </div>
 
-        {/* Boîte de dialogue de confirmation de suppression */}
         {showDeleteConfirmation && (
-          <div className="fixed inset-0 z-60 overflow-y-auto">
+          <div className="fixed inset-0 z-[60] overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen px-2 sm:px-4 pt-4 pb-20 text-center">
-              <div className="fixed inset-0 transition-opacity" onClick={() => setShowDeleteConfirmation(false)}>
-                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-              </div>
-              <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all w-full max-w-[95vw] sm:max-w-lg">
-                <div className="bg-white px-3 sm:px-4 pt-4 sm:pt-5 pb-3 sm:pb-4">
-                  <div className="sm:flex sm:items-start">
-                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                      <TrashIcon className="h-5 w-5 text-red-600" aria-hidden="true" />
-                    </div>
-                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                      <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900">
-                        Confirmation de suppression
-                      </h3>
-                      <div className="mt-2">
-                        <p className="text-xs sm:text-sm text-gray-500">
-                          Êtes-vous sûr de vouloir supprimer ce message ? Cette action est irréversible.
-                        </p>
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0"
+                enterTo="opacity-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100"
+                leaveTo="opacity-0"
+              >
+                <div className="fixed inset-0 transition-opacity" onClick={() => setShowDeleteConfirmation(false)} aria-hidden="true">
+                  <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+              </Transition.Child>
+              
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all w-full max-w-[95vw] sm:max-w-lg relative z-[70]">
+                  <div className="bg-white px-3 sm:px-4 pt-4 sm:pt-5 pb-3 sm:pb-4">
+                    <div className="sm:flex sm:items-start">
+                      <div className="mx-auto flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <TrashIcon className="h-5 w-5 text-red-600" aria-hidden="true" />
+                      </div>
+                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <Dialog.Title as="h3" className="text-base sm:text-lg leading-6 font-medium text-gray-900">
+                          Confirmation de suppression
+                        </Dialog.Title>
+                        <div className="mt-2">
+                          <p className="text-xs sm:text-sm text-gray-500">
+                            Êtes-vous sûr de vouloir supprimer ce message ? Cette action est irréversible.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                <div className="bg-gray-50 px-3 sm:px-4 py-3 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="button"
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-xs sm:text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto"
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? 'Suppression...' : 'Supprimer'}
-                  </button>
-                  <button
-                    type="button"
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto"
-                    onClick={() => setShowDeleteConfirmation(false)}
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </div>
+                  <div className="bg-gray-50 px-3 sm:px-4 py-3 sm:flex sm:flex-row-reverse">
+                    <button
+                      type="button"
+                      className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-xs sm:text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto"
+                      onClick={handleDeleteMessage}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? 'Suppression...' : 'Supprimer'}
+                    </button>
+                    <button
+                      type="button"
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto"
+                      onClick={() => setShowDeleteConfirmation(false)}
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
             </div>
           </div>
         )}
