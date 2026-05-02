@@ -1854,7 +1854,7 @@ export default function DashboardClient() {
               }`}
             >
               <CheckIcon className={`h-5 w-5 ${taskFilter === 'completed' ? 'text-green-200' : 'text-gray-400'} mr-2`} />
-              <span>Tâches complétées</span>
+              <span>Tâches complétées du jour</span>
               <span className={`ml-3 px-2.5 py-0.5 text-xs rounded-full ${
                 taskFilter === 'completed'
                   ? 'bg-green-500 text-white'
