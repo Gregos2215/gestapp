@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 
 export default function RegisterForm() {
   const [email, setEmail] = useState('');
@@ -59,19 +60,19 @@ export default function RegisterForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="gestapp-shell ga-subtle-grid min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="ga-card max-w-md w-full space-y-8 p-8 sm:p-10">
         <div className="flex flex-col items-center">
           {/* Logo GestApp */}
           <div className="flex items-center justify-center flex-col">
-            <div className="h-24 w-24 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-200/50 mb-4">
+            <div className="h-20 w-20 rounded-2xl bg-gradient-to-tr from-emerald-900 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-200/60 mb-4">
               <span className="text-white font-bold text-5xl">G</span>
             </div>
-            <span className="text-4xl font-bold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-500 bg-clip-text text-transparent mb-8">
+            <span className="text-4xl font-extrabold text-emerald-900 mb-8">
               GestApp
             </span>
           </div>
-          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-950">
             Créer un compte
           </h2>
         </div>
@@ -81,13 +82,13 @@ export default function RegisterForm() {
           <div className="mt-8 space-y-4">
             <button
               onClick={() => setUserType('employer')}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="ga-btn-primary w-full py-3 px-4 text-sm"
             >
               Je suis un employeur
             </button>
             <button
               onClick={() => setUserType('employee')}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              className="ga-btn-secondary w-full py-3 px-4 text-sm"
             >
               Je suis un employé
             </button>
@@ -101,13 +102,13 @@ export default function RegisterForm() {
               <button
                 type="button"
                 onClick={() => setUserType(null)}
-                className="mb-6 w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="ga-btn-secondary mb-6 w-full py-2.5 px-4 text-sm"
               >
                 Changer le type de compte
               </button>
             </div>
 
-            <div className="rounded-md shadow-sm -space-y-px">
+            <div className="space-y-3">
               <div>
                 <label htmlFor="first-name" className="sr-only">
                   Prénom
@@ -117,7 +118,7 @@ export default function RegisterForm() {
                   name="firstName"
                   type="text"
                   required
-                  className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="ga-input relative block w-full px-4 py-3 placeholder-gray-400 sm:text-sm"
                   placeholder="Prénom"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
@@ -132,7 +133,7 @@ export default function RegisterForm() {
                   name="lastName"
                   type="text"
                   required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="ga-input relative block w-full px-4 py-3 placeholder-gray-400 sm:text-sm"
                   placeholder="Nom"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
@@ -148,7 +149,7 @@ export default function RegisterForm() {
                   type="email"
                   autoComplete="email"
                   required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="ga-input relative block w-full px-4 py-3 placeholder-gray-400 sm:text-sm"
                   placeholder="Adresse email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -164,7 +165,7 @@ export default function RegisterForm() {
                   type="password"
                   autoComplete="new-password"
                   required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="ga-input relative block w-full px-4 py-3 placeholder-gray-400 sm:text-sm"
                   placeholder="Mot de passe"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -180,7 +181,7 @@ export default function RegisterForm() {
                   type="password"
                   autoComplete="new-password"
                   required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="ga-input relative block w-full px-4 py-3 placeholder-gray-400 sm:text-sm"
                   placeholder="Confirmer le mot de passe"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -195,7 +196,7 @@ export default function RegisterForm() {
                   name="code"
                   type="text"
                   required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="ga-input relative block w-full px-4 py-3 placeholder-gray-400 sm:text-sm"
                   placeholder={userType === 'employer' ? 'Créer un code unique pour votre centre' : 'Entrer le code fourni par votre employeur'}
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
@@ -207,18 +208,20 @@ export default function RegisterForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-                  userType === 'employer' 
-                    ? 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500' 
-                    : 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
-                } focus:outline-none focus:ring-2 focus:ring-offset-2`}
+                className="ga-btn-primary group relative w-full py-3 px-4 text-sm"
               >
                 {loading ? 'Création...' : 'Créer un compte'}
               </button>
             </div>
           </form>
         )}
+        <Link
+          href="/login"
+          className="block text-center text-sm font-bold text-emerald-800 hover:text-emerald-950"
+        >
+          Déjà un compte ? Se connecter
+        </Link>
       </div>
     </div>
   );
-} 
+}

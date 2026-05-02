@@ -49,7 +49,7 @@ export default function CreateResidentModal({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-gray-500/25" />
+          <div className="fixed inset-0 bg-emerald-950/20" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -63,7 +63,7 @@ export default function CreateResidentModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-3xl transform overflow-hidden ga-modal-panel bg-white p-6 transition-all">
                 <Dialog.Title
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900 mb-6"

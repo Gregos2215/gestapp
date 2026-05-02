@@ -385,20 +385,20 @@ export default function TaskDetailModal({
   return (
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <div className="fixed inset-0 bg-gray-500/25 transition-opacity" />
+        <div className="fixed inset-0 bg-emerald-950/20 transition-opacity" />
 
         <div className="fixed inset-0 z-10">
           <div className="flex min-h-full items-center justify-center p-4">
-            <Dialog.Panel className="relative transform overflow-hidden rounded-xl bg-white shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg flex flex-col max-h-[90vh]">
+            <Dialog.Panel className="relative transform overflow-hidden ga-modal-panel bg-white transition-all sm:my-8 sm:w-full sm:max-w-lg flex flex-col max-h-[90vh]">
               {/* En-tête du modal avec dégradé */}
-              <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4 flex-shrink-0">
+              <div className="ga-modal-header px-6 py-4 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <Dialog.Title as="h3" className="text-lg font-semibold text-white">
                     {editMode ? 'Modifier la tâche' : 'Détails de la tâche'}
                   </Dialog.Title>
                   <button
                     type="button"
-                    className="rounded-md bg-indigo-600/50 text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-white"
+                    className="rounded-md bg-emerald-800/50 text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-white"
                     onClick={onClose}
                   >
                     <span className="sr-only">Fermer</span>
@@ -415,14 +415,14 @@ export default function TaskDetailModal({
                       <div className="space-y-6">
                         {/* Section Résident (si tâche de type résident) */}
                         {type === 'resident' && task.residentName && (
-                          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200 shadow-sm">
+                          <div className="bg-gradient-to-r from-emerald-50 to-white rounded-xl p-6 border border-emerald-200 shadow-sm">
                             <div className="flex items-center gap-3 mb-3">
-                              <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-indigo-100">
-                                <UserGroupIcon className="h-6 w-6 text-indigo-600" />
+                              <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-emerald-100">
+                                <UserGroupIcon className="h-6 w-6 text-emerald-700" />
                               </div>
                               <div>
-                                <h3 className="text-base font-medium text-indigo-900">Résident associé</h3>
-                                <p className="text-xl font-semibold text-indigo-700">{task.residentName}</p>
+                                <h3 className="text-base font-medium text-emerald-950">Résident associé</h3>
+                                <p className="text-xl font-semibold text-emerald-800">{task.residentName}</p>
                               </div>
                             </div>
                           </div>
@@ -437,13 +437,13 @@ export default function TaskDetailModal({
                             {/* Type de tâche */}
                             <div>
                               <label className="block text-base font-medium text-gray-900 mb-2 flex items-center gap-2">
-                                <DocumentTextIcon className="h-5 w-5 text-indigo-600" />
+                                <DocumentTextIcon className="h-5 w-5 text-emerald-700" />
                                 Type de tâche
                               </label>
                               <select
                                 value={type}
                                 onChange={(e) => setType(e.target.value as 'resident' | 'general')}
-                                className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base text-gray-900 font-medium transition-colors duration-200 hover:border-indigo-300 py-2.5"
+                                className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-base text-gray-900 font-medium transition-colors duration-200 hover:border-emerald-300 py-2.5"
                               >
                                 <option value="resident">Résident</option>
                                 <option value="general">Général</option>
@@ -453,14 +453,14 @@ export default function TaskDetailModal({
                             {/* Nom de la tâche */}
                             <div>
                               <label className="block text-base font-medium text-gray-900 mb-2 flex items-center gap-2">
-                                <PencilSquareIcon className="h-5 w-5 text-indigo-600" />
+                                <PencilSquareIcon className="h-5 w-5 text-emerald-700" />
                                 Nom de la tâche
                               </label>
                               <input
                                 type="text"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base text-gray-900 font-medium transition-colors duration-200 hover:border-indigo-300 py-2.5"
+                                className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-base text-gray-900 font-medium transition-colors duration-200 hover:border-emerald-300 py-2.5"
                                 placeholder="Entrez le nom de la tâche"
                               />
                             </div>
@@ -469,14 +469,14 @@ export default function TaskDetailModal({
                           {/* Description */}
                           <div>
                             <label className="block text-base font-medium text-gray-900 mb-2 flex items-center gap-2">
-                              <DocumentTextIcon className="h-5 w-5 text-indigo-600" />
+                              <DocumentTextIcon className="h-5 w-5 text-emerald-700" />
                               Description
                             </label>
                             <textarea
                               value={description}
                               onChange={(e) => setDescription(e.target.value)}
                               rows={3}
-                              className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base text-gray-900 transition-colors duration-200 hover:border-indigo-300 py-2.5"
+                              className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-base text-gray-900 transition-colors duration-200 hover:border-emerald-300 py-2.5"
                               placeholder="Décrivez la tâche en détail"
                             />
                           </div>
@@ -489,7 +489,7 @@ export default function TaskDetailModal({
                           </h4>
                           <div>
                             <label className="block text-base font-medium text-gray-900 mb-2 flex items-center gap-2">
-                              <CalendarIcon className="h-5 w-5 text-indigo-600" />
+                              <CalendarIcon className="h-5 w-5 text-emerald-700" />
                               Date et heure d&apos;échéance
                             </label>
                             <div className="relative z-30">
@@ -499,7 +499,7 @@ export default function TaskDetailModal({
                                 showTimeSelect
                                 dateFormat="dd/MM/yyyy HH:mm"
                                 locale={fr}
-                                className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base text-gray-900 font-medium transition-colors duration-200 hover:border-indigo-300 py-2.5"
+                                className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-base text-gray-900 font-medium transition-colors duration-200 hover:border-emerald-300 py-2.5"
                                 popperClassName="z-50"
                                 popperPlacement="bottom-start"
                                 wrapperClassName="z-50 w-full"
@@ -515,13 +515,13 @@ export default function TaskDetailModal({
                           </h4>
                           <div>
                             <label className="block text-base font-medium text-gray-900 mb-2 flex items-center gap-2">
-                              <ArrowPathIcon className="h-5 w-5 text-indigo-600" />
+                              <ArrowPathIcon className="h-5 w-5 text-emerald-700" />
                               Type de récurrence
                             </label>
                             <select
                               value={recurrenceType}
                               onChange={(e) => setRecurrenceType(e.target.value)}
-                              className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base text-gray-900 font-medium transition-colors duration-200 hover:border-indigo-300 py-2.5"
+                              className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-base text-gray-900 font-medium transition-colors duration-200 hover:border-emerald-300 py-2.5"
                             >
                               <option value="none">Aucune récurrence</option>
                               <option value="daily">Quotidienne</option>
@@ -553,7 +553,7 @@ export default function TaskDetailModal({
                                       type="checkbox"
                                       checked={selectedDays.includes(day.value)}
                                       onChange={() => toggleDaySelection(day.value)}
-                                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                      className="h-4 w-4 text-emerald-700 focus:ring-emerald-700 border-gray-300 rounded"
                                     />
                                     <label htmlFor={`day-${day.value}`} className="ml-2 block text-sm text-gray-700">
                                       {day.label}
@@ -578,7 +578,7 @@ export default function TaskDetailModal({
                         {task.type === 'resident' ? (
                           task.residentName && (
                             <div className="flex items-center">
-                              <span className="text-base font-semibold text-indigo-700">
+                              <span className="text-base font-semibold text-emerald-800">
                                 {task.residentName}
                               </span>
                             </div>
@@ -624,7 +624,7 @@ export default function TaskDetailModal({
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
                           <div className="flex items-center text-gray-600 mb-2">
-                            <CalendarIcon className="h-5 w-5 text-indigo-600 mr-2" />
+                            <CalendarIcon className="h-5 w-5 text-emerald-700 mr-2" />
                             <span className="text-sm font-medium">Date d&apos;échéance</span>
                           </div>
                           <p className="text-lg font-semibold text-gray-900">
@@ -633,7 +633,7 @@ export default function TaskDetailModal({
                         </div>
                         <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
                           <div className="flex items-center text-gray-600 mb-2">
-                            <ClockIcon className="h-5 w-5 text-indigo-600 mr-2" />
+                            <ClockIcon className="h-5 w-5 text-emerald-700 mr-2" />
                             <span className="text-sm font-medium">Heure</span>
                           </div>
                           <p className="text-2xl font-bold text-gray-900">
@@ -645,7 +645,7 @@ export default function TaskDetailModal({
                       {/* Récurrence */}
                       <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
                         <div className="flex items-center text-gray-600 mb-2">
-                          <ArrowPathIcon className="h-5 w-5 text-indigo-600 mr-2" />
+                          <ArrowPathIcon className="h-5 w-5 text-emerald-700 mr-2" />
                           <span className="text-sm font-medium">Récurrence</span>
                         </div>
                         <p className="text-lg font-semibold text-gray-900">
@@ -672,7 +672,7 @@ export default function TaskDetailModal({
                         {task.recurrenceType === 'specificDays' && task.specificDays && task.specificDays.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {task.specificDays.map(day => (
-                              <span key={day} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-indigo-100 text-indigo-800">
+                              <span key={day} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-emerald-100 text-emerald-800">
                                 {day === 'monday' && 'Lundi'}
                                 {day === 'tuesday' && 'Mardi'}
                                 {day === 'wednesday' && 'Mercredi'}
@@ -735,13 +735,13 @@ export default function TaskDetailModal({
               </div>
 
               {/* Actions - Fixed at bottom */}
-              <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 flex-shrink-0 border-t border-gray-200">
+              <div className="bg-emerald-50/50 px-6 py-4 flex justify-end gap-3 flex-shrink-0 border-t border-gray-200">
                 {editMode ? (
                   <>
                     <button
                       type="button"
                       onClick={() => setEditMode(false)}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700"
                     >
                       Annuler
                     </button>
@@ -749,7 +749,7 @@ export default function TaskDetailModal({
                       type="button"
                       onClick={handleSave}
                       disabled={recurrenceType === 'specificDays' && selectedDays.length === 0}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed"
                     >
                       <CheckIcon className="h-4 w-4 mr-1.5" />
                       Enregistrer
@@ -770,7 +770,7 @@ export default function TaskDetailModal({
                     <button
                       type="button"
                       onClick={() => setEditMode(true)}
-                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-150"
                     >
                       <PencilSquareIcon className="h-4 w-4 mr-1.5" />
                       Modifier
@@ -814,7 +814,7 @@ export default function TaskDetailModal({
                                 value="single"
                                 checked={deleteOption === 'single'}
                                 onChange={() => setDeleteOption('single')}
-                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                className="h-4 w-4 text-emerald-700 focus:ring-emerald-700 border-gray-300"
                               />
                               <span className="ml-2 block text-sm text-gray-700">
                                 Uniquement cette occurrence
@@ -827,7 +827,7 @@ export default function TaskDetailModal({
                                 value="all"
                                 checked={deleteOption === 'all'}
                                 onChange={() => setDeleteOption('all')}
-                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                className="h-4 w-4 text-emerald-700 focus:ring-emerald-700 border-gray-300"
                               />
                               <span className="ml-2 block text-sm text-gray-700">
                                 Cette occurrence et toutes les occurrences futures

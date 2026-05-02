@@ -83,19 +83,19 @@ export default function CreateReportModal({
   return (
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <div className="fixed inset-0 bg-gray-500/25 transition-opacity" />
+        <div className="fixed inset-0 bg-emerald-950/20 transition-opacity" />
 
         <div className="fixed inset-0 z-10 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
-            <Dialog.Panel className="relative transform overflow-hidden rounded-xl bg-white shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl flex flex-col max-h-[90vh]">
-              <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4 flex-shrink-0">
+            <Dialog.Panel className="relative transform overflow-hidden ga-modal-panel bg-white transition-all sm:my-8 sm:w-full sm:max-w-2xl flex flex-col max-h-[90vh]">
+              <div className="ga-modal-header px-6 py-4 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <Dialog.Title as="h3" className="text-lg font-semibold text-white">
                     Nouveau rapport d'activité
                   </Dialog.Title>
                   <button
                     type="button"
-                    className="rounded-md bg-indigo-600/50 text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-white"
+                    className="rounded-md bg-emerald-800/50 text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-white"
                     onClick={onClose}
                   >
                     <span className="sr-only">Fermer</span>
@@ -111,7 +111,7 @@ export default function CreateReportModal({
                     Auteur du rapport
                   </label>
                   <div className="mt-1 flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center text-white font-semibold text-sm shadow-sm">
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-900 to-emerald-700 flex items-center justify-center text-white font-semibold text-sm shadow-sm">
                       {currentUserName.split(' ').map(n => n[0]).join('')}
                     </div>
                     <span className="text-base font-medium text-gray-900">
@@ -130,17 +130,17 @@ export default function CreateReportModal({
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     rows={12}
-                    className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base text-gray-900 transition-colors duration-200 hover:border-indigo-300 py-2.5 px-3"
+                    className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-base text-gray-900 transition-colors duration-200 hover:border-emerald-300 py-2.5 px-3"
                     placeholder="Écrivez votre rapport ici..."
                   />
                 </div>
               </div>
 
-              <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 flex-shrink-0 border-t border-gray-200">
+              <div className="bg-emerald-50/50 px-6 py-4 flex justify-end gap-3 flex-shrink-0 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700"
                 >
                   Annuler
                 </button>
@@ -148,7 +148,7 @@ export default function CreateReportModal({
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting || !content.trim()}
-                  className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                  className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 ${
                     (isSubmitting || !content.trim()) && 'opacity-50 cursor-not-allowed'
                   }`}
                 >

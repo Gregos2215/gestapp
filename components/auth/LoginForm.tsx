@@ -37,24 +37,24 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="gestapp-shell ga-subtle-grid min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="ga-card max-w-md w-full space-y-8 p-8 sm:p-10">
         <div className="flex flex-col items-center">
           {/* Logo GestApp */}
           <div className="flex items-center justify-center flex-col">
-            <div className="h-24 w-24 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-200/50 mb-4">
+            <div className="h-20 w-20 rounded-2xl bg-gradient-to-tr from-emerald-900 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-200/60 mb-4">
               <span className="text-white font-bold text-5xl">G</span>
             </div>
-            <span className="text-4xl font-bold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-500 bg-clip-text text-transparent mb-8">
+            <span className="text-4xl font-extrabold text-emerald-900 mb-8">
               GestApp
             </span>
           </div>
-          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-950">
             Connexion à votre compte
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
+          <div className="space-y-3">
             <div>
               <label htmlFor="email-address" className="sr-only">
                 Adresse email
@@ -65,7 +65,7 @@ export default function LoginForm() {
                 type="email"
                 autoComplete="email"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="ga-input relative block w-full px-4 py-3 placeholder-gray-400 sm:text-sm"
                 placeholder="Adresse email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -81,7 +81,7 @@ export default function LoginForm() {
                 type="password"
                 autoComplete="current-password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="ga-input relative block w-full px-4 py-3 placeholder-gray-400 sm:text-sm"
                 placeholder="Mot de passe"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -93,7 +93,7 @@ export default function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+              className={`ga-btn-primary group relative w-full py-3 px-4 text-sm ${
                 loading ? 'opacity-75 cursor-not-allowed' : ''
               }`}
             >
@@ -112,7 +112,7 @@ export default function LoginForm() {
             
             <Link 
               href="/register" 
-              className="text-center text-sm text-indigo-600 hover:text-indigo-500 font-medium"
+              className="text-center text-sm text-emerald-800 hover:text-emerald-950 font-bold"
             >
               Pas encore de compte ? S'inscrire
             </Link>

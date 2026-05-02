@@ -672,7 +672,7 @@ export default function ResidentTasksPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-700"></div>
       </div>
     );
   }
@@ -685,7 +685,7 @@ export default function ResidentTasksPage() {
           <p className="mt-2 text-gray-600">Le résident que vous recherchez n&apos;existe pas.</p>
           <button
             onClick={() => router.push('/dashboard?tab=residents')}
-            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-emerald-800 hover:bg-emerald-900"
           >
             <ArrowLeftIcon className="h-5 w-5 mr-2" />
             Retour à la gestion des résidents
@@ -723,7 +723,7 @@ export default function ResidentTasksPage() {
                 dateFormat="dd/MM/yyyy"
                 locale={fr}
                 placeholderText="Filtrer par date"
-                className="w-full sm:w-auto px-4 py-2 pr-10 text-sm border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-600 text-gray-700"
+                className="w-full sm:w-auto px-4 py-2 pr-10 text-sm border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:border-emerald-600 placeholder-gray-400 text-gray-700"
                 customInput={
                   <input
                     className="w-full sm:w-auto"
@@ -769,7 +769,7 @@ export default function ResidentTasksPage() {
                             {task.status === 'completed' ? 'Complétée' : 'À faire'}
                           </span>
                           {task.isVirtualOccurrence && (
-                            <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">
+                            <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-800">
                               Occurrence future
                             </span>
                           )}
@@ -910,7 +910,7 @@ export default function ResidentTasksPage() {
                 </button>
                 <button
                   type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   onClick={() => {
                     setIsConfirmCompleteModalOpen(false);
                     setTaskToComplete(null);

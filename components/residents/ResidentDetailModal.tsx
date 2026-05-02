@@ -138,7 +138,7 @@ export default function ResidentDetailModal({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-gray-500/25 backdrop-blur-sm transition-opacity" />
+          <div className="fixed inset-0 bg-emerald-950/20 backdrop-blur-sm transition-opacity" />
         </Transition.Child>
 
         <div className="fixed inset-0 z-10 overflow-y-auto">
@@ -152,9 +152,9 @@ export default function ResidentDetailModal({
               leaveFrom="opacity-100 translate-y-0 sm:scale-100"
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <Dialog.Panel className="relative transform rounded-xl bg-white shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+              <Dialog.Panel className="relative transform ga-modal-panel bg-white transition-all sm:my-8 sm:w-full sm:max-w-2xl">
                 {/* Header avec gradient */}
-                <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-t-xl px-4 py-5 sm:px-6">
+                <div className="ga-modal-header rounded-t-xl px-4 py-5 sm:px-6">
                   <div className="flex items-center justify-between">
                     <Dialog.Title className="text-xl font-semibold leading-6 text-white">
                       {isEditing ? 'Modifier le résident' : 'Détails du résident'}
@@ -164,7 +164,7 @@ export default function ResidentDetailModal({
                         <>
                           <button
                             onClick={handleViewTasks}
-                            className="rounded-md bg-indigo-500 px-3 py-2 text-white hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-white flex items-center space-x-2"
+                            className="rounded-md bg-emerald-700 px-3 py-2 text-white hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-white flex items-center space-x-2"
                             title="Voir les tâches du résident"
                           >
                             <ClipboardDocumentListIcon className="h-5 w-5" />
@@ -172,7 +172,7 @@ export default function ResidentDetailModal({
                           </button>
                           <button
                             onClick={() => setIsEditing(true)}
-                            className="rounded-md bg-indigo-500 p-2 text-white hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-white"
+                            className="rounded-md bg-emerald-700 p-2 text-white hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-white"
                           >
                             <PencilSquareIcon className="h-5 w-5" />
                           </button>
@@ -180,7 +180,7 @@ export default function ResidentDetailModal({
                       )}
                       <button
                         onClick={onClose}
-                        className="rounded-md bg-indigo-500 p-2 text-white hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-white"
+                        className="rounded-md bg-emerald-700 p-2 text-white hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-white"
                       >
                         <XMarkIcon className="h-5 w-5" />
                       </button>
@@ -205,7 +205,7 @@ export default function ResidentDetailModal({
                       <div className="mt-5 flex justify-center space-x-3">
                         <button
                           onClick={() => setIsConfirmingDelete(false)}
-                          className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                          className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700"
                         >
                           Annuler
                         </button>
@@ -238,7 +238,7 @@ export default function ResidentDetailModal({
                                           ...editedResident,
                                           firstName: e.target.value
                                         })}
-                                        className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 transition-all duration-200"
+                                        className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:ring-2 transition-all duration-200"
                                       />
                                     </div>
                                     <div>
@@ -252,7 +252,7 @@ export default function ResidentDetailModal({
                                           ...editedResident,
                                           lastName: e.target.value
                                         })}
-                                        className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 transition-all duration-200"
+                                        className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:ring-2 transition-all duration-200"
                                       />
                                     </div>
                                   </div>
@@ -267,7 +267,7 @@ export default function ResidentDetailModal({
                                           ...editedResident,
                                           gender: e.target.value as 'male' | 'female'
                                         })}
-                                        className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 transition-all duration-200"
+                                        className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:ring-2 transition-all duration-200"
                                       >
                                         <option value="male">Homme</option>
                                         <option value="female">Femme</option>
@@ -285,7 +285,7 @@ export default function ResidentDetailModal({
                                         })}
                                         dateFormat="dd/MM/yyyy"
                                         locale={fr}
-                                        className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 transition-all duration-200"
+                                        className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:ring-2 transition-all duration-200"
                                       />
                                     </div>
                                   </div>
@@ -328,7 +328,7 @@ export default function ResidentDetailModal({
                                     ...editedResident,
                                     condition: e.target.value as 'intellectual_disability' | 'autism' | 'dementia'
                                   })}
-                                  className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 transition-all duration-200"
+                                  className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:ring-2 transition-all duration-200"
                                 >
                                   <option value="intellectual_disability">Déficient intellectuel</option>
                                   <option value="autism">TSA</option>
@@ -362,7 +362,7 @@ export default function ResidentDetailModal({
                                       ...editedResident,
                                       language: e.target.value as 'french' | 'english' | 'spanish' | 'creole' | 'other'
                                     })}
-                                    className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 transition-all duration-200"
+                                    className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:ring-2 transition-all duration-200"
                                   >
                                     <option value="french">Français</option>
                                     <option value="english">Anglais</option>
@@ -376,7 +376,7 @@ export default function ResidentDetailModal({
                                     Communication verbale
                                   </label>
                                   <div className="mt-2">
-                                    <label className="inline-flex items-center bg-gray-50 px-4 py-2 rounded-lg border border-gray-300">
+                                    <label className="inline-flex items-center bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
                                       <input
                                         type="checkbox"
                                         checked={editedResident.isVerbal}
@@ -384,7 +384,7 @@ export default function ResidentDetailModal({
                                           ...editedResident,
                                           isVerbal: e.target.checked
                                         })}
-                                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        className="h-4 w-4 rounded border-gray-300 text-emerald-700 focus:ring-emerald-700"
                                       />
                                       <span className="ml-2 text-sm text-gray-700">
                                         Communication verbale
@@ -431,7 +431,7 @@ export default function ResidentDetailModal({
                                     ...editedResident,
                                     autonomyLevel: e.target.value as 'autonomous' | 'semi-autonomous' | 'dependent'
                                   })}
-                                  className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 transition-all duration-200"
+                                  className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:ring-2 transition-all duration-200"
                                 >
                                   <option value="autonomous">Autonome</option>
                                   <option value="semi-autonomous">Semi-autonome</option>
@@ -466,7 +466,7 @@ export default function ResidentDetailModal({
                                     Allergies
                                   </label>
                                   <div className="mt-2">
-                                    <label className="inline-flex items-center bg-gray-50 px-4 py-2 rounded-lg border border-gray-300">
+                                    <label className="inline-flex items-center bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
                                       <input
                                         type="checkbox"
                                         checked={editedResident.hasAllergies}
@@ -475,7 +475,7 @@ export default function ResidentDetailModal({
                                           hasAllergies: e.target.checked,
                                           allergies: e.target.checked ? editedResident.allergies : null
                                         })}
-                                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        className="h-4 w-4 rounded border-gray-300 text-emerald-700 focus:ring-emerald-700"
                                       />
                                       <span className="ml-2 text-sm text-gray-700">
                                         A des allergies
@@ -490,7 +490,7 @@ export default function ResidentDetailModal({
                                         allergies: e.target.value
                                       })}
                                       rows={3}
-                                      className="mt-2 block w-full rounded-lg border-gray-300 bg-gray-50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:bg-white transition-colors duration-200 sm:text-sm"
+                                      className="mt-2 block w-full rounded-lg border-gray-300 bg-gray-50 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:bg-white transition-colors duration-200 sm:text-sm"
                                       placeholder="Détails des allergies..."
                                     />
                                   )}
@@ -500,7 +500,7 @@ export default function ResidentDetailModal({
                                     Handicap
                                   </label>
                                   <div className="mt-2">
-                                    <label className="inline-flex items-center bg-gray-50 px-4 py-2 rounded-lg border border-gray-300">
+                                    <label className="inline-flex items-center bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
                                       <input
                                         type="checkbox"
                                         checked={editedResident.hasDisability}
@@ -509,7 +509,7 @@ export default function ResidentDetailModal({
                                           hasDisability: e.target.checked,
                                           disability: e.target.checked ? editedResident.disability : null
                                         })}
-                                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        className="h-4 w-4 rounded border-gray-300 text-emerald-700 focus:ring-emerald-700"
                                       />
                                       <span className="ml-2 text-sm text-gray-700">
                                         A un handicap
@@ -524,7 +524,7 @@ export default function ResidentDetailModal({
                                         disability: e.target.value
                                       })}
                                       rows={3}
-                                      className="mt-2 block w-full rounded-lg border-gray-300 bg-gray-50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:bg-white transition-colors duration-200 sm:text-sm"
+                                      className="mt-2 block w-full rounded-lg border-gray-300 bg-gray-50 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:bg-white transition-colors duration-200 sm:text-sm"
                                       placeholder="Détails du handicap..."
                                     />
                                   )}
@@ -574,7 +574,7 @@ export default function ResidentDetailModal({
                                     description: e.target.value
                                   })}
                                   rows={8}
-                                  className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 transition-all duration-200"
+                                  className="mt-1 block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 focus:ring-2 transition-all duration-200"
                                   placeholder="Exemple : Marie aime particulièrement les activités artistiques, notamment la peinture. Elle préfère manger dans un environnement calme. Elle a besoin d'aide pour..."
                                 />
                               </div>
@@ -592,14 +592,14 @@ export default function ResidentDetailModal({
 
                 {/* Footer avec actions */}
                 {!isConfirmingDelete && (
-                  <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 rounded-b-xl">
+                  <div className="bg-emerald-50/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 rounded-b-xl">
                     {isEditing ? (
                       <>
                         <button
                           type="button"
                           onClick={handleSave}
                           disabled={isSaving}
-                          className="inline-flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                          className="inline-flex w-full justify-center rounded-md border border-transparent bg-emerald-800 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
                         >
                           {isSaving ? (
                             <>
@@ -622,7 +622,7 @@ export default function ResidentDetailModal({
                             setIsEditing(false);
                             setEditedResident(resident);
                           }}
-                          className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                          className="mt-3 inline-flex w-full justify-center rounded-full border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                         >
                           Annuler
                         </button>

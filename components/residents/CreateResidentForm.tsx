@@ -103,16 +103,16 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* En-tête du formulaire */}
-      <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white p-6 rounded-xl shadow-lg mb-8">
+      <div className="ga-modal-header text-white p-6 rounded-xl shadow-lg mb-8">
         <h2 className="text-xl font-semibold">Informations du résident</h2>
-        <p className="text-indigo-100 mt-2">Remplissez les informations ci-dessous pour créer un nouveau résident.</p>
+        <p className="text-emerald-100 mt-2">Remplissez les informations ci-dessous pour créer un nouveau résident.</p>
       </div>
 
       <div className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm space-y-8">
         {/* Informations de base */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-            <UserIcon className="h-6 w-6 text-indigo-500" />
+            <UserIcon className="h-6 w-6 text-emerald-700" />
             Informations personnelles
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -125,7 +125,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                 id="firstName"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="block w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 hover:border-gray-400"
+                className="block w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700 hover:border-gray-400"
                 placeholder="Entrez le prénom"
                 required
               />
@@ -139,7 +139,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                 id="lastName"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="block w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 hover:border-gray-400"
+                className="block w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700 hover:border-gray-400"
                 placeholder="Entrez le nom"
                 required
               />
@@ -154,7 +154,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
               Genre
             </label>
             <div className="grid grid-cols-2 gap-4">
-              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                 <input
                   type="radio"
                   name="gender"
@@ -163,14 +163,14 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   onChange={(e) => setGender(e.target.value as Gender)}
                   className="sr-only"
                 />
-                <span className={`text-sm font-medium ${gender === 'male' ? 'text-indigo-600' : 'text-gray-900'}`}>
+                <span className={`text-sm font-medium ${gender === 'male' ? 'text-emerald-700' : 'text-gray-900'}`}>
                   Homme
                 </span>
                 {gender === 'male' && (
-                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                 )}
               </label>
-              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                 <input
                   type="radio"
                   name="gender"
@@ -179,11 +179,11 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   onChange={(e) => setGender(e.target.value as Gender)}
                   className="sr-only"
                 />
-                <span className={`text-sm font-medium ${gender === 'female' ? 'text-indigo-600' : 'text-gray-900'}`}>
+                <span className={`text-sm font-medium ${gender === 'female' ? 'text-emerald-700' : 'text-gray-900'}`}>
                   Femme
                 </span>
                 {gender === 'female' && (
-                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                 )}
               </label>
             </div>
@@ -202,7 +202,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                 scrollableYearDropdown
                 yearDropdownItemNumber={100}
                 placeholderText="Sélectionner une date"
-                className="block w-full cursor-pointer rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm transition-all duration-200 hover:border-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                className="block w-full cursor-pointer rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm transition-all duration-200 hover:border-gray-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700"
               />
               <CalendarIcon className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             </div>
@@ -218,7 +218,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
             id="language"
             value={language}
             onChange={(e) => setLanguage(e.target.value as Language)}
-            className="block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm transition-all duration-200 hover:border-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+            className="block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm transition-all duration-200 hover:border-gray-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700"
           >
             <option value="french">Français</option>
             <option value="english">Anglais</option>
@@ -231,11 +231,11 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
         {/* État du résident */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-            <UserIcon className="h-6 w-6 text-indigo-500" />
+            <UserIcon className="h-6 w-6 text-emerald-700" />
             État du résident
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+            <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
               <input
                 type="radio"
                 name="condition"
@@ -244,14 +244,14 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                 onChange={(e) => setCondition(e.target.value as Condition)}
                 className="sr-only"
               />
-              <span className={`text-sm font-medium ${condition === 'intellectual_disability' ? 'text-indigo-600' : 'text-gray-900'}`}>
+              <span className={`text-sm font-medium ${condition === 'intellectual_disability' ? 'text-emerald-700' : 'text-gray-900'}`}>
                 Déficient intellectuel
               </span>
               {condition === 'intellectual_disability' && (
-                <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
               )}
             </label>
-            <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+            <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
               <input
                 type="radio"
                 name="condition"
@@ -260,14 +260,14 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                 onChange={(e) => setCondition(e.target.value as Condition)}
                 className="sr-only"
               />
-              <span className={`text-sm font-medium ${condition === 'autism' ? 'text-indigo-600' : 'text-gray-900'}`}>
+              <span className={`text-sm font-medium ${condition === 'autism' ? 'text-emerald-700' : 'text-gray-900'}`}>
                 TSA
               </span>
               {condition === 'autism' && (
-                <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
               )}
             </label>
-            <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+            <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
               <input
                 type="radio"
                 name="condition"
@@ -276,11 +276,11 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                 onChange={(e) => setCondition(e.target.value as Condition)}
                 className="sr-only"
               />
-              <span className={`text-sm font-medium ${condition === 'dementia' ? 'text-indigo-600' : 'text-gray-900'}`}>
+              <span className={`text-sm font-medium ${condition === 'dementia' ? 'text-emerald-700' : 'text-gray-900'}`}>
                 Démence
               </span>
               {condition === 'dementia' && (
-                <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
               )}
             </label>
           </div>
@@ -289,10 +289,10 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
         {/* Description */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-            <DocumentTextIcon className="h-6 w-6 text-indigo-500" />
+            <DocumentTextIcon className="h-6 w-6 text-emerald-700" />
             Description
           </h3>
-          <div className="rounded-lg border-2 border-gray-300 bg-white shadow-sm transition-all duration-200 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500 hover:border-gray-400">
+          <div className="rounded-lg border-2 border-gray-300 bg-white shadow-sm transition-all duration-200 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-700 hover:border-gray-400">
             <textarea
               id="description"
               value={description}
@@ -308,7 +308,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
         {/* Santé et Communication */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-            <HeartIcon className="h-6 w-6 text-indigo-500" />
+            <HeartIcon className="h-6 w-6 text-emerald-700" />
             Santé et Communication
           </h3>
           
@@ -319,7 +319,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                 Allergies
               </label>
               <div className="grid grid-cols-2 gap-4">
-                <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+                <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                   <input
                     type="radio"
                     name="hasAllergies"
@@ -327,14 +327,14 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                     onChange={() => setHasAllergies(true)}
                     className="sr-only"
                   />
-                  <span className={`text-sm font-medium ${hasAllergies === true ? 'text-indigo-600' : 'text-gray-900'}`}>
+                  <span className={`text-sm font-medium ${hasAllergies === true ? 'text-emerald-700' : 'text-gray-900'}`}>
                     A des allergies
                   </span>
                   {hasAllergies === true && (
-                    <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                    <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                   )}
                 </label>
-                <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+                <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                   <input
                     type="radio"
                     name="hasAllergies"
@@ -342,11 +342,11 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                     onChange={() => setHasAllergies(false)}
                     className="sr-only"
                   />
-                  <span className={`text-sm font-medium ${hasAllergies === false ? 'text-indigo-600' : 'text-gray-900'}`}>
+                  <span className={`text-sm font-medium ${hasAllergies === false ? 'text-emerald-700' : 'text-gray-900'}`}>
                     Pas d'allergies
                   </span>
                   {hasAllergies === false && (
-                    <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                    <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                   )}
                 </label>
               </div>
@@ -356,7 +356,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                     value={allergies}
                     onChange={(e) => setAllergies(e.target.value)}
                     rows={3}
-                    className="block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 hover:border-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                    className="block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 hover:border-gray-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700"
                     placeholder="Décrivez les allergies en détail..."
                     required
                   />
@@ -371,7 +371,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   Communication
                 </label>
                 <div className="grid grid-cols-2 gap-4">
-                  <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+                  <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                     <input
                       type="radio"
                       name="isVerbal"
@@ -379,14 +379,14 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                       onChange={() => setIsVerbal(true)}
                       className="sr-only"
                     />
-                    <span className={`text-sm font-medium ${isVerbal ? 'text-indigo-600' : 'text-gray-900'}`}>
+                    <span className={`text-sm font-medium ${isVerbal ? 'text-emerald-700' : 'text-gray-900'}`}>
                       Verbal
                     </span>
                     {isVerbal && (
-                      <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                      <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                     )}
                   </label>
-                  <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+                  <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                     <input
                       type="radio"
                       name="isVerbal"
@@ -394,11 +394,11 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                       onChange={() => setIsVerbal(false)}
                       className="sr-only"
                     />
-                    <span className={`text-sm font-medium ${!isVerbal ? 'text-indigo-600' : 'text-gray-900'}`}>
+                    <span className={`text-sm font-medium ${!isVerbal ? 'text-emerald-700' : 'text-gray-900'}`}>
                       Non verbal
                     </span>
                     {!isVerbal && (
-                      <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                      <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                     )}
                   </label>
                 </div>
@@ -409,7 +409,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   Incontinence
                 </label>
                 <div className="grid grid-cols-2 gap-4">
-                  <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+                  <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                     <input
                       type="radio"
                       name="isIncontinent"
@@ -417,14 +417,14 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                       onChange={() => setIsIncontinent(true)}
                       className="sr-only"
                     />
-                    <span className={`text-sm font-medium ${isIncontinent ? 'text-indigo-600' : 'text-gray-900'}`}>
+                    <span className={`text-sm font-medium ${isIncontinent ? 'text-emerald-700' : 'text-gray-900'}`}>
                       Oui
                     </span>
                     {isIncontinent && (
-                      <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                      <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                     )}
                   </label>
-                  <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+                  <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                     <input
                       type="radio"
                       name="isIncontinent"
@@ -432,11 +432,11 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                       onChange={() => setIsIncontinent(false)}
                       className="sr-only"
                     />
-                    <span className={`text-sm font-medium ${!isIncontinent ? 'text-indigo-600' : 'text-gray-900'}`}>
+                    <span className={`text-sm font-medium ${!isIncontinent ? 'text-emerald-700' : 'text-gray-900'}`}>
                       Non
                     </span>
                     {!isIncontinent && (
-                      <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                      <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                     )}
                   </label>
                 </div>
@@ -448,7 +448,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
         {/* Autonomie et Handicap */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-            <ArrowTrendingUpIcon className="h-6 w-6 text-indigo-500" />
+            <ArrowTrendingUpIcon className="h-6 w-6 text-emerald-700" />
             Autonomie et Handicap
           </h3>
 
@@ -458,7 +458,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
               Niveau d'autonomie
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                 <input
                   type="radio"
                   name="autonomyLevel"
@@ -467,14 +467,14 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   onChange={(e) => setAutonomyLevel(e.target.value as Autonomy)}
                   className="sr-only"
                 />
-                <span className={`text-sm font-medium ${autonomyLevel === 'autonomous' ? 'text-indigo-600' : 'text-gray-900'}`}>
+                <span className={`text-sm font-medium ${autonomyLevel === 'autonomous' ? 'text-emerald-700' : 'text-gray-900'}`}>
                   Autonome
                 </span>
                 {autonomyLevel === 'autonomous' && (
-                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                 )}
               </label>
-              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                 <input
                   type="radio"
                   name="autonomyLevel"
@@ -483,14 +483,14 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   onChange={(e) => setAutonomyLevel(e.target.value as Autonomy)}
                   className="sr-only"
                 />
-                <span className={`text-sm font-medium ${autonomyLevel === 'semi-autonomous' ? 'text-indigo-600' : 'text-gray-900'}`}>
+                <span className={`text-sm font-medium ${autonomyLevel === 'semi-autonomous' ? 'text-emerald-700' : 'text-gray-900'}`}>
                   Semi-autonome
                 </span>
                 {autonomyLevel === 'semi-autonomous' && (
-                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                 )}
               </label>
-              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                 <input
                   type="radio"
                   name="autonomyLevel"
@@ -499,11 +499,11 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   onChange={(e) => setAutonomyLevel(e.target.value as Autonomy)}
                   className="sr-only"
                 />
-                <span className={`text-sm font-medium ${autonomyLevel === 'dependent' ? 'text-indigo-600' : 'text-gray-900'}`}>
+                <span className={`text-sm font-medium ${autonomyLevel === 'dependent' ? 'text-emerald-700' : 'text-gray-900'}`}>
                   Dépendant
                 </span>
                 {autonomyLevel === 'dependent' && (
-                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                 )}
               </label>
             </div>
@@ -515,7 +515,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
               Handicap
             </label>
             <div className="grid grid-cols-2 gap-4">
-              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                 <input
                   type="radio"
                   name="hasDisability"
@@ -523,14 +523,14 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   onChange={() => setHasDisability(true)}
                   className="sr-only"
                 />
-                <span className={`text-sm font-medium ${hasDisability ? 'text-indigo-600' : 'text-gray-900'}`}>
+                <span className={`text-sm font-medium ${hasDisability ? 'text-emerald-700' : 'text-gray-900'}`}>
                   A un handicap
                 </span>
                 {hasDisability && (
-                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                 )}
               </label>
-              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-indigo-500">
+              <label className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-gray-300 bg-white p-4 shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-emerald-700">
                 <input
                   type="radio"
                   name="hasDisability"
@@ -538,11 +538,11 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   onChange={() => setHasDisability(false)}
                   className="sr-only"
                 />
-                <span className={`text-sm font-medium ${!hasDisability ? 'text-indigo-600' : 'text-gray-900'}`}>
+                <span className={`text-sm font-medium ${!hasDisability ? 'text-emerald-700' : 'text-gray-900'}`}>
                   Pas de handicap
                 </span>
                 {!hasDisability && (
-                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-indigo-600" />
+                  <CheckIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-700" />
                 )}
               </label>
             </div>
@@ -552,7 +552,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
                   value={disability}
                   onChange={(e) => setDisability(e.target.value)}
                   rows={3}
-                  className="block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 hover:border-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                  className="block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 hover:border-gray-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700"
                   placeholder="Décrivez le handicap en détail..."
                   required
                 />
@@ -567,7 +567,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex items-center justify-center rounded-lg border-2 border-gray-300 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          className="inline-flex items-center justify-center rounded-lg border-2 border-gray-300 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2"
         >
           <XMarkIcon className="h-5 w-5 mr-2" />
           Annuler
@@ -575,7 +575,7 @@ export default function CreateResidentForm({ centerCode, onClose, onResidentCrea
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex items-center justify-center rounded-lg border-2 border-transparent bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center justify-center rounded-lg border-2 border-transparent bg-emerald-800 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
             <>

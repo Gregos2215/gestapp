@@ -191,7 +191,7 @@ const EmployeesPage = () => {
   const employeesCount = employees.filter(emp => emp.id !== currentUserId && !emp.isEmployer).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-10">
+    <div className="gestapp-shell min-h-screen pb-10">
       {/* En-tête */}
       <div className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -208,7 +208,7 @@ const EmployeesPage = () => {
             </div>
             <button
               onClick={() => router.push('/register')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
             >
               <UserPlusIcon className="h-5 w-5 mr-2" />
               Ajouter un employé
@@ -221,19 +221,19 @@ const EmployeesPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Statistiques */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
+          <div className="ga-card p-6 transition-all duration-200 hover:shadow-md">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Total</p>
                 <p className="text-2xl font-bold text-gray-900">{totalEmployees}</p>
               </div>
-              <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <UsersIcon className="h-6 w-6 text-indigo-600" />
+              <div className="h-12 w-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <UsersIcon className="h-6 w-6 text-emerald-700" />
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
+          <div className="ga-card p-6 transition-all duration-200 hover:shadow-md">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">En ligne</p>
@@ -257,7 +257,7 @@ const EmployeesPage = () => {
               </div>
               <input
                 type="text"
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors duration-200"
+                className="ga-input block w-full pl-10 pr-3 py-3 leading-5 placeholder-gray-500 focus:outline-none focus:ring-emerald-700 focus:border-emerald-600 sm:text-sm transition-colors duration-200"
                 placeholder="Rechercher un employé par nom, prénom ou email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -265,7 +265,7 @@ const EmployeesPage = () => {
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="inline-flex items-center px-4 py-2.5 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+              className="inline-flex items-center px-4 py-2.5 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
             >
               <AdjustmentsHorizontalIcon className="h-5 w-5 mr-2 text-gray-500" />
               Filtres {showFilters ? '▲' : '▼'}
@@ -274,7 +274,7 @@ const EmployeesPage = () => {
           
           {/* Filtres avancés */}
           {showFilters && (
-            <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm animate-fadeIn">
+            <div className="mt-4 p-4 ga-card-flat shadow-sm animate-fadeIn">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Filtrer par:</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -284,7 +284,7 @@ const EmployeesPage = () => {
                       onClick={() => setStatusFilter('all')}
                       className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors duration-200 ${
                         statusFilter === 'all'
-                          ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                           : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                       }`}
                     >
@@ -322,7 +322,7 @@ const EmployeesPage = () => {
                       onClick={() => setTypeFilter('all')}
                       className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors duration-200 ${
                         typeFilter === 'all'
-                          ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                           : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                       }`}
                     >
@@ -360,12 +360,12 @@ const EmployeesPage = () => {
 
         {/* Liste des employés */}
         {loading ? (
-          <div className="flex flex-col justify-center items-center h-64 bg-white rounded-xl shadow-sm p-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+          <div className="flex flex-col justify-center items-center h-64 ga-card p-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-600 mb-4"></div>
             <p className="text-gray-500 font-medium">Chargement des employés...</p>
           </div>
         ) : filteredEmployees.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center border border-gray-100">
+          <div className="ga-card p-8 text-center border border-gray-100">
             <div className="flex flex-col items-center max-w-md mx-auto">
               <div className="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <UserCircleIcon className="h-8 w-8 text-gray-400" />
@@ -384,14 +384,14 @@ const EmployeesPage = () => {
                     setStatusFilter('all');
                     setTypeFilter('all');
                   }}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
                 >
                   Réinitialiser les filtres
                 </button>
               ) : (
                 <button
                   onClick={() => router.push('/register')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
                 >
                   <UserPlusIcon className="h-5 w-5 mr-2" />
                   Ajouter un employé
@@ -406,7 +406,7 @@ const EmployeesPage = () => {
               {filteredEmployees.map((employee) => (
                 <div
                   key={employee.id}
-                  className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-all duration-200 transform hover:-translate-y-1 hover-lift"
+                  className="ga-card overflow-hidden hover:shadow-md transition-all duration-200 transform hover:-translate-y-1 hover-lift"
                 >
                   <div className="relative">
                     <div className="absolute top-0 right-0 mt-4 mr-4">
@@ -455,7 +455,7 @@ const EmployeesPage = () => {
                             setSelectedEmployee(employee);
                             setShowProfileModal(true);
                           }}
-                          className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                          className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-emerald-700 bg-white hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
                         >
                           Voir le profil
                         </button>
@@ -490,11 +490,11 @@ const EmployeesPage = () => {
               aria-hidden="true"
               onClick={() => setShowProfileModal(false)}
             >
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              <div className="absolute inset-0 bg-emerald-950 opacity-30"></div>
             </div>
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
             <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 px-6 py-4">
+              <div className="ga-modal-header px-6 py-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold text-white">
                     Profil d&apos;{selectedEmployee.isEmployer ? 'employeur' : 'employé'}
@@ -502,7 +502,7 @@ const EmployeesPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowProfileModal(false)}
-                    className="rounded-md bg-indigo-600 text-gray-200 hover:text-white focus:outline-none"
+                    className="rounded-md bg-emerald-800 text-gray-200 hover:text-white focus:outline-none"
                   >
                     <span className="sr-only">Fermer</span>
                     <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -591,11 +591,11 @@ const EmployeesPage = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-3">
+              <div className="bg-emerald-50/50 px-6 py-4 flex flex-row-reverse gap-3">
                 <button
                   type="button"
                   onClick={() => setShowProfileModal(false)}
-                  className="inline-flex justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                  className="inline-flex justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
                 >
                   Fermer
                 </button>
@@ -627,7 +627,7 @@ const EmployeesPage = () => {
               aria-hidden="true"
               onClick={() => setShowDeleteModal(false)}
             >
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              <div className="absolute inset-0 bg-emerald-950 opacity-30"></div>
             </div>
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full animate-scaleIn">
@@ -648,7 +648,7 @@ const EmployeesPage = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <div className="bg-emerald-50/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
                   onClick={handleDeleteEmployee}
@@ -672,7 +672,7 @@ const EmployeesPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
-                  className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2.5 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200"
+                  className="mt-3 w-full inline-flex justify-center rounded-xl border border-gray-200 shadow-sm px-4 py-2.5 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200"
                 >
                   Annuler
                 </button>

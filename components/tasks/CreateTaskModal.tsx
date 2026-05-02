@@ -39,12 +39,12 @@ export default function CreateTaskModal({ isOpen, onClose, centerCode, onTaskCre
   return (
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <div className="fixed inset-0 bg-gray-500/75 backdrop-blur-sm transition-opacity" />
+        <div className="fixed inset-0 bg-emerald-950/28 backdrop-blur-sm transition-opacity" />
 
         <div className="fixed inset-0 z-10 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
-            <Dialog.Panel className="relative transform rounded-xl bg-white shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg w-full max-w-[95vw] max-h-[90vh] flex flex-col">
-              <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-3 sm:px-6 flex items-center justify-between rounded-t-xl">
+            <Dialog.Panel className="relative transform ga-modal-panel bg-white transition-all sm:my-8 sm:w-full sm:max-w-lg w-full max-w-[95vw] max-h-[90vh] flex flex-col">
+              <div className="bg-gradient-to-r from-emerald-900 to-emerald-700 px-4 py-3 sm:px-6 flex items-center justify-between rounded-t-xl">
                 <Dialog.Title as="h3" className="text-base sm:text-lg font-semibold text-white">
                   Nouvelle tâche
                 </Dialog.Title>

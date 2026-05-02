@@ -129,7 +129,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
       await deleteDoc(doc(db, 'messages', message.id));
       toast.success('Message supprimé avec succès');
       setShowDeleteConfirmation(false);
-      onClose(); 
+      onClose();
       if (onMessageDeleted) {
         onMessageDeleted();
       }
@@ -159,7 +159,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-gray-500/75 backdrop-blur-sm transition-opacity" />
+          <div className="fixed inset-0 bg-emerald-950/28 backdrop-blur-sm transition-opacity" />
         </Transition.Child>
 
         {/* Modal Panel */}
@@ -174,16 +174,16 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="relative transform overflow-hidden rounded-xl bg-white shadow-2xl transition-all w-full max-w-[95vw] sm:max-w-2xl flex flex-col max-h-[90vh]">
+              <Dialog.Panel className="relative transform overflow-hidden ga-modal-panel bg-white transition-all w-full max-w-[95vw] sm:max-w-2xl flex flex-col max-h-[90vh]">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">
+                <div className="ga-modal-header px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">
                   <div className="flex items-center justify-between">
                     <Dialog.Title as="h3" className="text-base sm:text-lg font-semibold text-white">
                       {isEditing ? 'Modifier le message' : 'Détails du message'}
                     </Dialog.Title>
                     <button
                       type="button"
-                      className="rounded-md bg-indigo-600/50 text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-white p-1.5"
+                      className="rounded-md bg-emerald-800/50 text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-white p-1.5"
                       onClick={() => {
                         if (isEditing) {
                           setIsEditing(false);
@@ -214,7 +214,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                         id="edit-title"
                         value={editedTitle}
                         onChange={(e) => setEditedTitle(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm px-4 py-2 text-gray-900"
+                        className="w-full rounded-xl border border-gray-200 focus:ring-emerald-700 focus:border-emerald-600 shadow-sm px-4 py-2 text-gray-900"
                         placeholder="Titre du message (optionnel)"
                       />
                     </div>
@@ -228,8 +228,8 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                   
                   {/* Informations Auteur et Date */}
                   <div className="flex items-center space-x-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                     <div className={`h-10 w-10 rounded-full ${message.author.isEmployer ? 'bg-indigo-100' : 'bg-green-100'} flex items-center justify-center flex-shrink-0`}>
-                        <span className={`text-sm font-semibold ${message.author.isEmployer ? 'text-indigo-700' : 'text-green-700'}`}>
+                     <div className={`h-10 w-10 rounded-full ${message.author.isEmployer ? 'bg-emerald-100' : 'bg-green-100'} flex items-center justify-center flex-shrink-0`}>
+                        <span className={`text-sm font-semibold ${message.author.isEmployer ? 'text-emerald-800' : 'text-green-700'}`}>
                           {message.author.name.split(' ').map(n => n.charAt(0).toUpperCase()).join('')}
                         </span>
                       </div>
@@ -249,7 +249,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                           onClick={() => {
                             setIsEditing(true);
                           }}
-                          className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium text-indigo-600 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-lg"
+                          className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium text-emerald-700 hover:text-emerald-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 rounded-lg"
                         >
                           <PencilIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
                           Modifier
@@ -263,7 +263,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                           value={editedContent}
                           onChange={(e) => setEditedContent(e.target.value)}
                           rows={8}
-                          className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm sm:text-base text-gray-900 transition-colors duration-200 hover:border-indigo-300 py-2 sm:py-2.5 px-2 sm:px-3"
+                          className="block w-full rounded-lg border-2 border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-sm sm:text-base text-gray-900 transition-colors duration-200 hover:border-emerald-300 py-2 sm:py-2.5 px-2 sm:px-3"
                         />
                       </div>
                     ) : (
@@ -277,7 +277,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                 </div>
 
                 {/* Footer */}
-                <div className="bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:justify-between gap-2 sm:gap-3 flex-shrink-0 border-t border-gray-200">
+                <div className="bg-emerald-50/50 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:justify-between gap-2 sm:gap-3 flex-shrink-0 border-t border-gray-200">
                   {canDelete && !isEditing && (
                     <button
                       type="button"
@@ -297,7 +297,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                           onClick={() => {
                             setIsEditing(false);
                           }}
-                          className="flex-1 sm:flex-none px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                          className="flex-1 sm:flex-none px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700"
                         >
                           Annuler
                         </button>
@@ -305,7 +305,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                           type="button"
                           onClick={handleSave}
                           disabled={isSaving || (!editedTitle.trim() && !editedContent.trim())}
-                          className={`flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                          className={`flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-full text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 ${
                             (isSaving || (!editedTitle.trim() && !editedContent.trim())) && 'opacity-50 cursor-not-allowed'
                           }`}
                         >
@@ -319,7 +319,7 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                           if (showDeleteConfirmation) setShowDeleteConfirmation(false);
                           onClose();
                         }}
-                        className="w-full sm:w-auto px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        className="w-full sm:w-auto px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700"
                       >
                         Fermer
                       </button>
@@ -344,8 +344,8 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                 leaveTo="opacity-0"
               >
                 <div className="fixed inset-0 transition-opacity" onClick={() => setShowDeleteConfirmation(false)} aria-hidden="true">
-                  <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-                </div>
+                <div className="absolute inset-0 bg-emerald-950 opacity-30"></div>
+              </div>
               </Transition.Child>
               
               <Transition.Child
@@ -358,40 +358,40 @@ export default function MessageDetailModal({ isOpen, onClose, message, currentUs
                 leaveTo="opacity-0 scale-95"
               >
                 <Dialog.Panel className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all w-full max-w-[95vw] sm:max-w-lg relative z-[70]">
-                  <div className="bg-white px-3 sm:px-4 pt-4 sm:pt-5 pb-3 sm:pb-4">
-                    <div className="sm:flex sm:items-start">
-                      <div className="mx-auto flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                        <TrashIcon className="h-5 w-5 text-red-600" aria-hidden="true" />
-                      </div>
-                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                <div className="bg-white px-3 sm:px-4 pt-4 sm:pt-5 pb-3 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <TrashIcon className="h-5 w-5 text-red-600" aria-hidden="true" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
                         <Dialog.Title as="h3" className="text-base sm:text-lg leading-6 font-medium text-gray-900">
-                          Confirmation de suppression
+                        Confirmation de suppression
                         </Dialog.Title>
-                        <div className="mt-2">
-                          <p className="text-xs sm:text-sm text-gray-500">
-                            Êtes-vous sûr de vouloir supprimer ce message ? Cette action est irréversible.
-                          </p>
-                        </div>
+                      <div className="mt-2">
+                        <p className="text-xs sm:text-sm text-gray-500">
+                          Êtes-vous sûr de vouloir supprimer ce message ? Cette action est irréversible.
+                        </p>
                       </div>
                     </div>
                   </div>
-                  <div className="bg-gray-50 px-3 sm:px-4 py-3 sm:flex sm:flex-row-reverse">
-                    <button
-                      type="button"
-                      className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-xs sm:text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto"
+                </div>
+                <div className="bg-gray-50 px-3 sm:px-4 py-3 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-xs sm:text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto"
                       onClick={handleDeleteMessage}
-                      disabled={isDeleting}
-                    >
-                      {isDeleting ? 'Suppression...' : 'Supprimer'}
-                    </button>
-                    <button
-                      type="button"
-                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto"
-                      onClick={() => setShowDeleteConfirmation(false)}
-                    >
-                      Annuler
-                    </button>
-                  </div>
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Suppression...' : 'Supprimer'}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-full border border-gray-300 shadow-sm px-4 py-2 bg-white text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 sm:mt-0 sm:ml-3 sm:w-auto"
+                    onClick={() => setShowDeleteConfirmation(false)}
+                  >
+                    Annuler
+                  </button>
+                </div>
                 </Dialog.Panel>
               </Transition.Child>
             </div>

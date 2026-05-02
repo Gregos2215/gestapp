@@ -217,7 +217,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
         </h2>
         <button
           onClick={() => setTaskType('resident')}
-          className="w-full p-4 sm:p-6 text-left border border-gray-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all duration-200 group"
+          className="w-full p-4 sm:p-6 text-left border border-gray-200 rounded-xl hover:border-emerald-600 hover:bg-emerald-50 transition-all duration-200 group"
         >
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full bg-purple-100 group-hover:bg-purple-200 transition-colors duration-200">
@@ -233,7 +233,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
         </button>
         <button
           onClick={() => setTaskType('general')}
-          className="w-full p-4 sm:p-6 text-left border border-gray-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all duration-200 group"
+          className="w-full p-4 sm:p-6 text-left border border-gray-200 rounded-xl hover:border-emerald-600 hover:bg-emerald-50 transition-all duration-200 group"
         >
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full bg-blue-100 group-hover:bg-blue-200 transition-colors duration-200">
@@ -260,7 +260,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
         <button
           type="button"
           onClick={() => setTaskType(null)}
-          className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 whitespace-nowrap"
+          className="text-xs sm:text-sm text-emerald-700 hover:text-emerald-800 font-medium flex items-center gap-1 whitespace-nowrap"
         >
           <ArrowPathIcon className="h-3 w-3 sm:h-4 sm:w-4" />
           Changer le type
@@ -278,7 +278,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
               id="resident"
               value={selectedResident}
               onChange={(e) => setSelectedResident(e.target.value)}
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 py-2.5"
+              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-gray-900 py-2.5"
               required
             >
               <option value="">Sélectionnez un résident</option>
@@ -303,7 +303,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
             id="taskName"
             value={taskName}
             onChange={(e) => setTaskName(e.target.value)}
-            className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 placeholder-gray-400 py-2.5"
+            className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-gray-900 placeholder-gray-400 py-2.5"
             placeholder="Entrez le nom de la tâche"
             required
           />
@@ -319,7 +319,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 placeholder-gray-400 py-2.5"
+            className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-gray-900 placeholder-gray-400 py-2.5"
             placeholder="Décrivez la tâche en détail"
             required
           />
@@ -334,7 +334,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
             <DatePicker
               selected={dueDate}
               onChange={(date: Date | null) => date && setDueDate(date)}
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 py-2.5"
+              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-gray-900 py-2.5"
             />
           </div>
           <div>
@@ -350,7 +350,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
               timeIntervals={15}
               dateFormat="HH:mm"
               timeFormat="HH:mm"
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 py-2.5"
+              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-gray-900 py-2.5"
             />
           </div>
           <div className="sm:col-span-2">
@@ -362,7 +362,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
               id="recurrence"
               value={recurrenceType}
               onChange={(e) => setRecurrenceType(e.target.value as RecurrenceType)}
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 py-2.5"
+              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-600 focus:ring-emerald-700 text-gray-900 py-2.5"
             >
               <option value="none">Pas de récurrence</option>
               <option value="daily">Quotidien</option>
@@ -393,7 +393,7 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
                       type="checkbox"
                       checked={selectedDays.includes(day.value)}
                       onChange={() => toggleDaySelection(day.value)}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-emerald-700 focus:ring-emerald-700 border-gray-300 rounded"
                     />
                     <label htmlFor={`day-${day.value}`} className="ml-2 block text-sm text-gray-700">
                       {day.label}
@@ -413,14 +413,14 @@ export default function CreateTaskForm({ centerCode, onClose, onTaskCreated, cur
         <button
           type="button"
           onClick={onClose}
-          className="w-full sm:w-auto px-4 py-3 sm:py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+          className="w-full sm:w-auto px-4 py-3 sm:py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
         >
           Annuler
         </button>
         <button
           type="submit"
           disabled={loading || (recurrenceType === 'specificDays' && selectedDays.length === 0)}
-          className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-3 sm:py-2.5 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors duration-200"
+          className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-3 sm:py-2.5 text-sm font-medium text-white bg-emerald-800 border border-transparent rounded-lg shadow-sm hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed transition-colors duration-200"
         >
           {loading ? (
             <>
