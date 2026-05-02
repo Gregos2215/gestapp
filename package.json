@@ -20,10 +20,10 @@
     "@types/react-datepicker": "^6.2.0",
     "date-fns": "^4.1.0",
     "firebase": "^11.5.0",
-    "next": "15.2.4",
-    "react": "^19.0.0",
+    "next": "^15.5.15",
+    "react": "^19.2.5",
     "react-datepicker": "^8.2.1",
-    "react-dom": "^19.0.0",
+    "react-dom": "^19.2.5",
     "react-hot-toast": "^2.5.2"
   },
   "devDependencies": {
@@ -33,7 +33,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.2.4",
+    "eslint-config-next": "^15.5.15",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
