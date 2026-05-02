@@ -284,24 +284,36 @@ textarea {
 @media (max-width: 640px) {
   .ga-activity-card {
     min-height: auto;
+    padding: 1.5rem !important;
   }
 
   .ga-activity-list::before {
-    left: 4.42rem;
+    left: 4.08rem;
   }
 
   .ga-activity-row {
-    grid-template-columns: 3.6rem 1.15rem 3.25rem 1fr;
-    column-gap: .65rem;
+    grid-template-columns: 3.25rem .95rem 2.85rem minmax(0, 1fr);
+    column-gap: .5rem;
   }
 
   .ga-activity-time {
-    font-size: .82rem;
+    font-size: .8rem;
   }
 
   .ga-activity-icon {
-    width: 3.15rem;
-    height: 3.15rem;
+    width: 2.85rem;
+    height: 2.85rem;
+  }
+
+  .ga-activity-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .ga-activity-button {
+    width: 100%;
+    padding-inline: 1rem;
+    font-size: .95rem;
   }
 }
 

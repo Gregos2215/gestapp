@@ -2632,9 +2632,9 @@ export default function DashboardClient() {
                   <span className={`ga-activity-icon ${item.tone}`}>
                     <item.icon className="h-6 w-6" />
                   </span>
-                  <div>
-                    <p className="whitespace-nowrap text-base font-extrabold leading-tight text-white drop-shadow-sm">{item.title}</p>
-                    <p className="mt-2 whitespace-nowrap text-sm font-semibold text-white/78 sm:text-base">{item.subtitle}</p>
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-extrabold leading-tight text-white drop-shadow-sm sm:whitespace-nowrap sm:text-base">{item.title}</p>
+                    <p className="mt-1.5 break-words text-xs font-semibold leading-snug text-white/78 sm:mt-2 sm:whitespace-nowrap sm:text-base">{item.subtitle}</p>
                   </div>
                 </div>
               ))}
@@ -4303,12 +4303,12 @@ export default function DashboardClient() {
         )}
 
 
-        {/* Sidebar for desktop */}
+        {/* Sidebar */}
         <div className={`fixed inset-y-0 left-0 w-72 sm:w-64 bg-white/88 backdrop-blur-xl border-r border-emerald-900/5 z-40 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isMobileMenuOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full'
         }`}>
-          <div className="flex flex-col h-full">
-            <div className="flex items-center justify-center h-28">
+          <div className="flex flex-col h-full pt-20 lg:pt-0">
+            <div className="hidden lg:flex items-center justify-center h-28">
               <button
                 onClick={() => {
                   setActiveTab('accueil');
