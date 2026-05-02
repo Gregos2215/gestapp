@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, Timestamp, getDocs, orderBy, addDoc, writeBatch, deleteDoc, limit, setDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, Timestamp, getDocs, orderBy, addDoc, writeBatch, deleteDoc, deleteField, limit, setDoc } from 'firebase/firestore';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import toast from 'react-hot-toast';
 import { format, isSameDay } from 'date-fns';
@@ -134,7 +134,7 @@ interface Report {
 
 interface Alert {
   id: string;
-  type: 'task_created' | 'report_created' | 'task_overdue' | 'message_created';
+  type: 'task_created' | 'task_uncompleted' | 'report_created' | 'task_overdue' | 'message_created';
   title: string;
   message: string;
   createdAt: {
@@ -177,13 +177,9 @@ function safeFirebaseDate(firebaseDate: any): Date | null {
   return null;
 }
 
-// Move these component definitions before they are used
-const renderEmployeeView = (
-  isOnline: boolean,
-  toggleOnlineStatus: () => Promise<void>,
+const getEmployeeNextTasks = (
   tasks: Task[],
-  isDateSkippedFn: (task: Task, dateOrTimestamp: Date | number) => boolean,
-  router: ReturnType<typeof useRouter>
+  isDateSkippedFn: (task: Task, dateOrTimestamp: Date | number) => boolean
 ) => {
   // Fonction pour obtenir les prochaines tâches à afficher, en priorité:
   // 1. Tâches non complétées de la veille
@@ -287,9 +283,128 @@ const renderEmployeeView = (
     // Limiter à 10 tâches maximum (au lieu de 5)
     return nextTasks.slice(0, 10);
   };
-  
-  const nextTasks = getNextTasks();
-  
+
+  return getNextTasks();
+};
+
+const renderEmployeeNextTasks = (
+  tasks: Task[],
+  isDateSkippedFn: (task: Task, dateOrTimestamp: Date | number) => boolean,
+  router: ReturnType<typeof useRouter>
+) => {
+  const nextTasks = getEmployeeNextTasks(tasks, isDateSkippedFn);
+
+  return (
+    <div className="ga-card p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-extrabold text-gray-950">Prochaines tâches</h2>
+        <button
+          onClick={() => router.push('/dashboard?tab=taches')}
+          className="text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors duration-200"
+        >
+          Voir toutes les tâches
+        </button>
+      </div>
+
+      {nextTasks.length > 0 ? (
+        <div className="space-y-4">
+          {nextTasks.map((task) => {
+            // Vérifier si la tâche est en retard
+            const now = new Date();
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Date d'hier (à minuit)
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            // Convertir dueDate selon son type
+            let taskDueDate: Date;
+            if (task.dueDate instanceof Date) {
+              taskDueDate = task.dueDate;
+            } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
+              taskDueDate = task.dueDate.toDate();
+            } else {
+              taskDueDate = new Date(task.dueDate as unknown as string | number);
+            }
+
+            // Normaliser la date de la tâche pour comparer avec hier/aujourd'hui
+            const taskDateOnly = new Date(taskDueDate);
+            taskDateOnly.setHours(0, 0, 0, 0);
+
+            const isYesterday = taskDateOnly.getTime() === yesterday.getTime();
+            const isToday = taskDateOnly.getTime() === today.getTime();
+            const isOverdue = taskDueDate < now;
+
+            // Définir les styles et le texte en fonction du statut
+            let statusBg = 'bg-emerald-100';
+            let statusText = 'text-emerald-800';
+            let statusLabel = format(taskDueDate, 'HH:mm', { locale: fr });
+
+            if (isYesterday) {
+              statusBg = 'bg-orange-100';
+              statusText = 'text-orange-800';
+              statusLabel = 'Hier - Non complétée';
+            } else if (isToday && isOverdue) {
+              statusBg = 'bg-red-100';
+              statusText = 'text-red-800';
+              statusLabel = 'En retard';
+            }
+
+            return (
+              <div
+                key={task.id}
+                className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer ${
+                  isYesterday
+                    ? 'border-l-4 border-l-orange-500 bg-orange-50'
+                    : isToday && isOverdue
+                      ? 'border-l-4 border-l-red-500 bg-red-50'
+                      : 'border-gray-200 hover:border-emerald-200 hover:bg-emerald-50 border-l-4 ' +
+                        (task.type === 'resident' ? 'border-l-purple-500' : 'border-l-blue-500')
+                }`}
+                onClick={() => {
+                  if (isYesterday) {
+                    router.push('/dashboard?tab=taches&filter=yesterday');
+                  } else {
+                    router.push('/dashboard?tab=taches');
+                  }
+                }}
+              >
+                <div className="flex justify-between">
+                  <h3 className="font-medium text-gray-900">{task.name}</h3>
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusBg} ${statusText}`}>
+                    {statusLabel}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.description}</p>
+                <div className="mt-2 flex justify-between items-center">
+                  <span className="text-xs text-gray-500">
+                    {format(taskDueDate, 'dd/MM/yyyy', { locale: fr })}
+                  </span>
+                  <span className={`text-xs font-medium ${
+                    task.type === 'resident' ? 'text-purple-600' : 'text-blue-600'
+                  }`}>
+                    {task.type === 'resident' ? 'Résident' : 'Générale'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-center text-gray-500 py-6">
+          Aucune tâche à faire pour le moment
+        </p>
+      )}
+    </div>
+  );
+};
+
+// Move these component definitions before they are used
+const renderEmployeeView = (
+  isOnline: boolean,
+  toggleOnlineStatus: () => Promise<void>
+) => {
   return (
     <div className="space-y-6">
       {/* Section Mon statut */}
@@ -313,112 +428,6 @@ const renderEmployeeView = (
             {isOnline ? 'En ligne' : 'Hors ligne'}
           </span>
         </div>
-      </div>
-      
-      {/* Section Prochaines tâches */}
-      <div className="ga-card p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-extrabold text-gray-950">Prochaines tâches</h2>
-          <button
-            onClick={() => router.push('/dashboard?tab=taches')}
-            className="text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors duration-200"
-          >
-            Voir toutes les tâches
-          </button>
-        </div>
-        
-        {nextTasks.length > 0 ? (
-          <div className="space-y-4">
-            {nextTasks.map((task) => {
-              // Vérifier si la tâche est en retard
-              const now = new Date();
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              
-              // Date d'hier (à minuit)
-              const yesterday = new Date(today);
-              yesterday.setDate(yesterday.getDate() - 1);
-              
-              // Convertir dueDate selon son type
-              let taskDueDate: Date;
-              if (task.dueDate instanceof Date) {
-                taskDueDate = task.dueDate;
-              } else if (task.dueDate && typeof task.dueDate.toDate === 'function') {
-                taskDueDate = task.dueDate.toDate();
-              } else {
-                taskDueDate = new Date(task.dueDate as unknown as string | number);
-              }
-              
-              // Normaliser la date de la tâche pour comparer avec hier/aujourd'hui
-              const taskDateOnly = new Date(taskDueDate);
-              taskDateOnly.setHours(0, 0, 0, 0);
-              
-              const isYesterday = taskDateOnly.getTime() === yesterday.getTime();
-              const isToday = taskDateOnly.getTime() === today.getTime();
-              const isOverdue = taskDueDate < now;
-              
-              // Définir les styles et le texte en fonction du statut
-              let statusBg = 'bg-emerald-100';
-              let statusText = 'text-emerald-800';
-              let statusLabel = format(taskDueDate, 'HH:mm', { locale: fr });
-              
-              if (isYesterday) {
-                statusBg = 'bg-orange-100';
-                statusText = 'text-orange-800';
-                statusLabel = 'Hier - Non complétée';
-              } else if (isToday && isOverdue) {
-                statusBg = 'bg-red-100';
-                statusText = 'text-red-800';
-                statusLabel = 'En retard';
-              }
-              
-              return (
-                <div 
-                  key={task.id}
-                  className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer ${
-                    isYesterday
-                      ? 'border-l-4 border-l-orange-500 bg-orange-50'
-                      : isToday && isOverdue
-                        ? 'border-l-4 border-l-red-500 bg-red-50'
-                        : 'border-gray-200 hover:border-emerald-200 hover:bg-emerald-50 border-l-4 ' + 
-                          (task.type === 'resident' ? 'border-l-purple-500' : 'border-l-blue-500')
-                  }`}
-                  onClick={() => {
-                    // Si c'est une tâche de la veille, rediriger vers la section "Tâches non complétées de la veille"
-                    if (isYesterday) {
-                      router.push('/dashboard?tab=taches&filter=yesterday');
-                    } else {
-                      // Sinon, rediriger vers la section des tâches du jour
-                      router.push('/dashboard?tab=taches');
-                    }
-                  }}
-                >
-                  <div className="flex justify-between">
-                    <h3 className="font-medium text-gray-900">{task.name}</h3>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusBg} ${statusText}`}>
-                      {statusLabel}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.description}</p>
-                  <div className="mt-2 flex justify-between items-center">
-                    <span className="text-xs text-gray-500">
-                      {format(taskDueDate, 'dd/MM/yyyy', { locale: fr })}
-                    </span>
-                    <span className={`text-xs font-medium ${
-                      task.type === 'resident' ? 'text-purple-600' : 'text-blue-600'
-                    }`}>
-                      {task.type === 'resident' ? 'Résident' : 'Générale'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-center text-gray-500 py-6">
-            Aucune tâche à faire pour le moment
-          </p>
-        )}
       </div>
     </div>
   );
@@ -546,6 +555,12 @@ export default function DashboardClient() {
   const [currentReportPage, setCurrentReportPage] = useState(1);
   const reportsPerPage = 4;
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [isCenterMenuOpen, setIsCenterMenuOpen] = useState(false);
+  const [associatedCenters, setAssociatedCenters] = useState<string[]>([]);
+  const [isCreateCenterModalOpen, setIsCreateCenterModalOpen] = useState(false);
+  const [newCenterCode, setNewCenterCode] = useState('');
+  const [newCenterTitle, setNewCenterTitle] = useState('');
+  const [isCreatingCenter, setIsCreatingCenter] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -565,6 +580,8 @@ export default function DashboardClient() {
   const [isPreferencesModified, setIsPreferencesModified] = useState(false);
   const [isConfirmCompleteModalOpen, setIsConfirmCompleteModalOpen] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<string | null>(null);
+  const [isConfirmUncompleteModalOpen, setIsConfirmUncompleteModalOpen] = useState(false);
+  const [taskToUncomplete, setTaskToUncomplete] = useState<string | null>(null);
   
   // Ajouter après ces lignes:
   const [centerTitle, setCenterTitle] = useState<string>("Information du centre");
@@ -627,6 +644,26 @@ export default function DashboardClient() {
           setUserType(userData.isEmployer ? 'employer' : 'employee');
           setCenterCode(userData.centerCode);
           setIsOnline(userData.isOnline || false);
+
+          const normalizedActiveCenter = typeof userData.centerCode === 'string' ? userData.centerCode.trim().toUpperCase() : '';
+          const savedCenters = Array.isArray(userData.associatedCenters)
+            ? userData.associatedCenters
+                .filter((code: unknown): code is string => typeof code === 'string' && code.trim() !== '')
+                .map((code: string) => code.trim().toUpperCase())
+            : [];
+          const uniqueCenters = Array.from(new Set([normalizedActiveCenter, ...savedCenters].filter(Boolean)));
+          setAssociatedCenters(uniqueCenters);
+
+          if (
+            uniqueCenters.length > 0 &&
+            (!Array.isArray(userData.associatedCenters) ||
+              userData.associatedCenters.length !== uniqueCenters.length ||
+              uniqueCenters.some((code) => !userData.associatedCenters.includes(code)))
+          ) {
+            await updateDoc(doc(db, 'users', user.uid), {
+              associatedCenters: uniqueCenters
+            });
+          }
           
           // Récupérer les paramètres du centre si disponibles
           if (userData.centerCode && typeof userData.centerCode === 'string' && userData.centerCode.trim() !== '') {
@@ -813,10 +850,94 @@ export default function DashboardClient() {
     try {
       await logout();
       toast.success('Déconnexion réussie');
-      router.push('/login');
+      router.replace('/login');
     } catch (error) {
       console.error('Error logging out:', error);
       toast.error('Erreur lors de la déconnexion');
+    }
+  };
+
+  const normalizeCenterCode = (value: string) => value.trim().toUpperCase();
+
+  const handleSwitchCenter = async (nextCenterCode: string) => {
+    if (!customUser?.uid) return;
+
+    const normalizedCode = normalizeCenterCode(nextCenterCode);
+    if (!normalizedCode || normalizedCode === centerCode?.toUpperCase()) {
+      setIsCenterMenuOpen(false);
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', customUser.uid), {
+        centerCode: normalizedCode,
+        updatedAt: serverTimestamp()
+      });
+      toast.success(`Centre ${normalizedCode} activé`);
+      setIsCenterMenuOpen(false);
+      window.location.href = '/dashboard?tab=accueil';
+    } catch (error) {
+      console.error('Error switching center:', error);
+      toast.error('Impossible de changer de centre pour le moment');
+    }
+  };
+
+  const handleCreateCenter = async () => {
+    if (!customUser?.uid || !customUser.isEmployer) {
+      toast.error('Seuls les comptes employeurs peuvent créer un centre');
+      return;
+    }
+
+    const normalizedCode = normalizeCenterCode(newCenterCode);
+    const title = newCenterTitle.trim() || `Centre ${normalizedCode}`;
+
+    if (!normalizedCode) {
+      toast.error('Veuillez entrer un code de centre');
+      return;
+    }
+
+    if (associatedCenters.includes(normalizedCode)) {
+      toast.error('Ce centre est déjà associé à votre compte');
+      return;
+    }
+
+    setIsCreatingCenter(true);
+    try {
+      const centerRef = doc(db, 'centers', normalizedCode);
+      const centerDoc = await getDoc(centerRef);
+
+      if (centerDoc.exists()) {
+        toast.error('Ce code de centre existe déjà. Choisissez un code différent.');
+        return;
+      }
+
+      const nextCenters = Array.from(new Set([...associatedCenters, normalizedCode]));
+
+      await setDoc(centerRef, {
+        code: normalizedCode,
+        title,
+        subtitle: 'Informations du centre',
+        ownerId: customUser.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      await updateDoc(doc(db, 'users', customUser.uid), {
+        centerCode: normalizedCode,
+        associatedCenters: nextCenters,
+        updatedAt: serverTimestamp()
+      });
+
+      toast.success(`Centre ${normalizedCode} créé`);
+      setIsCreateCenterModalOpen(false);
+      setNewCenterCode('');
+      setNewCenterTitle('');
+      window.location.href = '/dashboard?tab=accueil';
+    } catch (error) {
+      console.error('Error creating center:', error);
+      toast.error('Impossible de créer le centre pour le moment');
+    } finally {
+      setIsCreatingCenter(false);
     }
   };
 
@@ -1095,6 +1216,62 @@ export default function DashboardClient() {
       // Fermer la modale en cas d'erreur aussi
       setIsConfirmCompleteModalOpen(false);
       setTaskToComplete(null);
+    }
+  };
+
+  const handleUncompleteTask = async (taskId: string) => {
+    if (!user || !customUser?.isEmployer) {
+      toast.error("Seuls les comptes employeurs peuvent exécuter cette action");
+      setIsConfirmUncompleteModalOpen(false);
+      setTaskToUncomplete(null);
+      return;
+    }
+
+    if (taskId.startsWith('virtual-')) {
+      toast.error("Impossible de modifier directement une occurrence future");
+      setIsConfirmUncompleteModalOpen(false);
+      setTaskToUncomplete(null);
+      return;
+    }
+
+    try {
+      const taskRef = doc(db, 'tasks', taskId);
+      const taskDoc = await getDoc(taskRef);
+
+      if (!taskDoc.exists()) {
+        toast.error("Cette tâche n'existe pas dans la base de données");
+        setIsConfirmUncompleteModalOpen(false);
+        setTaskToUncomplete(null);
+        return;
+      }
+
+      await updateDoc(taskRef, {
+        status: 'pending',
+        completedBy: deleteField()
+      });
+
+      const taskData = taskDoc.data() as Task;
+      await addDoc(collection(db, 'alerts'), {
+        type: 'task_uncompleted',
+        title: 'Tâche remise à compléter',
+        message: `La tâche "${taskData.name}" a été remise dans les tâches à compléter.`,
+        createdAt: serverTimestamp(),
+        readBy: [],
+        relatedId: taskId,
+        centerCode: customUser.centerCode,
+        excludedUsers: [customUser.uid]
+      });
+
+      toast.success("La tâche a été remise dans les tâches à compléter");
+      setTaskFilter('all');
+      setSelectedDate(null);
+      router.push('/dashboard?tab=taches&filter=all');
+    } catch (error) {
+      console.error('Error reverting completed task:', error);
+      toast.error("Erreur lors de la remise en attente de la tâche");
+    } finally {
+      setIsConfirmUncompleteModalOpen(false);
+      setTaskToUncomplete(null);
     }
   };
 
@@ -1463,22 +1640,17 @@ export default function DashboardClient() {
           case 'completed':
             return isToday && task.status === 'completed' && matchesSearch;
           case 'yesterday': {
-            // Calculer la date d'hier
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            yesterday.setHours(0, 0, 0, 0);
-            
-            const isYesterday = taskDate.getTime() === yesterday.getTime();
-            
-            // Si cette tâche est marquée comme ignorée (skippedDates) pour hier,
+            // Cette section affiche maintenant toutes les tâches non complétées avant aujourd'hui.
+            const isBeforeToday = taskDate.getTime() < today.getTime();
+
+            // Si cette tâche est marquée comme ignorée pour sa propre date,
             // on la considère comme traitée, même si elle n'a pas été explicitement marquée comme complétée
-            const isSkippedYesterday = task.skippedDates?.includes(yesterday.getTime());
+            const isSkippedTaskDate = task.skippedDates?.includes(taskDate.getTime());
             
             // Console log pour débogage
-            console.log(`[Filter Check Yesterday] Task ID: ${task.id}, Name: ${task.name}, isYesterday: ${isYesterday}, Status: ${task.status}, isSkippedYesterday: ${isSkippedYesterday}, Deleted: ${task.deleted}`);
+            console.log(`[Filter Check Uncompleted Past] Task ID: ${task.id}, Name: ${task.name}, isBeforeToday: ${isBeforeToday}, Status: ${task.status}, isSkippedTaskDate: ${isSkippedTaskDate}, Deleted: ${task.deleted}`);
             
-            // Inclure seulement si c'est une tâche d'hier, non complétée, non skippée, et correspond à la recherche
-            return isYesterday && task.status !== 'completed' && !isSkippedYesterday && matchesSearch;
+            return isBeforeToday && task.status !== 'completed' && !isSkippedTaskDate && matchesSearch;
           }
           // Modifié pour le filtre 'upcoming' sans date sélectionnée
           case 'upcoming':
@@ -1509,6 +1681,11 @@ export default function DashboardClient() {
       .sort((a, b) => {
         const dateA = safeFirebaseDate(a.dueDate) || new Date(0);
         const dateB = safeFirebaseDate(b.dueDate) || new Date(0);
+
+        if (taskFilter === 'yesterday') {
+          return dateB.getTime() - dateA.getTime();
+        }
+
         return dateA.getTime() - dateB.getTime();
       });
   }, [tasks, taskFilter, searchQuery, selectedDate, JSON.stringify(tasks.map(t => t.skippedDates?.length || 0)), generateFutureOccurrences]); // Ajout de generateFutureOccurrences
@@ -1712,7 +1889,7 @@ export default function DashboardClient() {
               }`}
             >
               <ClockIcon className={`h-5 w-5 ${taskFilter === 'yesterday' ? 'text-orange-200' : 'text-gray-400'} mr-2`} />
-              <span>Tâches non complétées de la veille</span>
+              <span>Toutes les tâches non complétées</span>
               <span className={`ml-3 px-2.5 py-0.5 text-xs rounded-full ${
                 taskFilter === 'yesterday'
                   ? 'bg-orange-500 text-white'
@@ -1725,18 +1902,14 @@ export default function DashboardClient() {
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
                   
-                  // Calculer la date d'hier
-                  const yesterday = new Date(today);
-                  yesterday.setDate(yesterday.getDate() - 1);
-                  
                   const taskDate = new Date(t.dueDate);
                   taskDate.setHours(0, 0, 0, 0);
                   
                   // Vérifier si la date est ignorée
-                  if (isDateSkipped(t, yesterday)) return false;
+                  if (isDateSkipped(t, taskDate)) return false;
                   
-                  // Vérifier si c'est une tâche de la veille non complétée
-                  return taskDate.getTime() === yesterday.getTime() && t.status !== 'completed';
+                  // Vérifier si c'est une tâche passée non complétée
+                  return taskDate.getTime() < today.getTime() && t.status !== 'completed';
                 }).length}
               </span>
             </button>
@@ -1939,23 +2112,33 @@ export default function DashboardClient() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (task.status !== 'completed') {
-                                // Au lieu d'appeler directement handleCompleteTask, ouvrir la modale de confirmation
+                              if (task.status === 'completed' && taskFilter === 'completed' && customUser?.isEmployer && !task.isVirtualOccurrence) {
+                                setTaskToUncomplete(task.id);
+                                setIsConfirmUncompleteModalOpen(true);
+                              } else if (task.status !== 'completed') {
                                 setTaskToComplete(task.id);
                                 setIsConfirmCompleteModalOpen(true);
                               }
                             }}
                             className={`inline-flex items-center px-3 py-2 border text-sm leading-4 font-medium rounded-md shadow-sm ${
                               task.status === 'completed'
-                                ? 'border-green-200 text-green-700 bg-green-50 cursor-default'
+                                ? taskFilter === 'completed' && customUser?.isEmployer && !task.isVirtualOccurrence
+                                  ? 'border-green-300 text-green-800 bg-green-50 hover:bg-green-100 transition-colors duration-200'
+                                  : 'border-green-200 text-green-700 bg-green-50 cursor-default'
                                 : task.isVirtualOccurrence
                                 ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
                                 : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200'
                             } focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                               task.status === 'completed' ? 'focus:ring-green-500' : 'focus:ring-gray-500'
                             }`}
-                            disabled={task.status === 'completed' || task.isVirtualOccurrence}
-                            title={task.isVirtualOccurrence ? "Impossible de compléter une occurrence future avant d'avoir complété les occurrences précédentes" : ""}
+                            disabled={(task.status === 'completed' && (taskFilter !== 'completed' || !customUser?.isEmployer || task.isVirtualOccurrence)) || (task.status !== 'completed' && task.isVirtualOccurrence)}
+                            title={
+                              task.status === 'completed' && taskFilter === 'completed' && customUser?.isEmployer
+                                ? "Remettre cette tâche à compléter"
+                                : task.isVirtualOccurrence
+                                ? "Impossible de compléter une occurrence future avant d'avoir complété les occurrences précédentes"
+                                : ""
+                            }
                           >
                             <CheckIcon className={`h-4 w-4 mr-1 ${
                               task.status === 'completed' ? 'text-green-500' : 'text-gray-400'
@@ -2616,6 +2799,12 @@ export default function DashboardClient() {
           </section>
         </div>
 
+        {userType !== 'employer' && (
+          <section>
+            {renderEmployeeNextTasks(tasks, isDateSkipped, router)}
+          </section>
+        )}
+
         <div className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.25fr] gap-6">
           <section className="ga-activity-card p-8 sm:p-10">
             <div className="flex items-center gap-4">
@@ -2706,7 +2895,7 @@ export default function DashboardClient() {
           </section>
         ) : (
           <section>
-            {renderEmployeeView(isOnline, toggleOnlineStatus, tasks, isDateSkipped, router)}
+            {renderEmployeeView(isOnline, toggleOnlineStatus)}
           </section>
         )}
 
@@ -3629,12 +3818,11 @@ export default function DashboardClient() {
                           
                           // Rediriger vers la tâche ou le rapport concerné
                           if (alert.relatedId) {
-                            if (alert.type === 'task_created' || alert.type === 'task_overdue') {
+                            if (alert.type === 'task_created' || alert.type === 'task_overdue' || alert.type === 'task_uncompleted') {
                               setActiveTab('taches');
                               setTaskFilter('all');
                               setSelectedDate(null);
-                              // Utiliser router.push à la place de window.history pour une meilleure gestion de l'historique
-                              router.push(`/dashboard?tab=${alert.type}&filter=all`);
+                              router.push('/dashboard?tab=taches&filter=all');
                               const task = tasks.find(t => t.id === alert.relatedId);
                               if (task) {
                                 setSelectedTask(task);
@@ -3667,11 +3855,12 @@ export default function DashboardClient() {
                             </p>
                           </div>
                           <div className={`rounded-full p-2 ${
-                            alert.type === 'task_created' ? 'bg-emerald-100 text-emerald-700' :
+                            alert.type === 'task_created' || alert.type === 'task_uncompleted' ? 'bg-emerald-100 text-emerald-700' :
                             alert.type === 'report_created' ? 'bg-green-100 text-green-600' :
                             'bg-red-100 text-red-600'
                           }`}>
                             {alert.type === 'task_created' && <ClipboardDocumentListIcon className="h-5 w-5" />}
+                            {alert.type === 'task_uncompleted' && <ClipboardDocumentListIcon className="h-5 w-5" />}
                             {alert.type === 'report_created' && <DocumentTextIcon className="h-5 w-5" />}
                             {alert.type === 'task_overdue' && <ClockIcon className="h-5 w-5" />}
                           </div>
@@ -3720,6 +3909,8 @@ export default function DashboardClient() {
     }
   };
 
+  const visibleCenterCodes = associatedCenters.length > 0 ? associatedCenters : [centerCode || 'GKC'];
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center gestapp-shell">
@@ -3736,7 +3927,10 @@ export default function DashboardClient() {
           <div className="relative">
             <div className="ga-card flex items-center overflow-hidden rounded-[1.35rem]">
               <button
-                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                onClick={() => {
+                  setIsCenterMenuOpen(!isCenterMenuOpen);
+                  setIsProfileMenuOpen(false);
+                }}
                 className="flex items-center gap-4 px-6 py-4 text-left transition-all duration-200 hover:bg-emerald-50/70"
               >
                 <span className="h-3 w-3 rounded-full bg-emerald-500" />
@@ -3748,7 +3942,10 @@ export default function DashboardClient() {
               </button>
               <div className="h-14 w-px bg-gray-200" />
               <button
-                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                onClick={() => {
+                  setIsProfileMenuOpen(!isProfileMenuOpen);
+                  setIsCenterMenuOpen(false);
+                }}
                 className="flex items-center gap-4 px-6 py-4 transition-all duration-200 group hover:bg-emerald-50/70"
               >
                 <div className="h-12 w-12 rounded-full bg-gradient-to-br from-emerald-900 to-emerald-700 flex items-center justify-center text-white font-bold text-sm shadow-sm group-hover:shadow-md transition-all duration-200">
@@ -3765,6 +3962,61 @@ export default function DashboardClient() {
                 </div>
               </button>
               </div>
+
+            {/* Center Dropdown Menu */}
+            {isCenterMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsCenterMenuOpen(false)}
+                />
+                <div className="ga-card absolute right-56 mt-3 w-80 py-3 z-50">
+                  <div className="px-4 pb-3">
+                    <p className="text-sm font-extrabold text-gray-950">Centres associés</p>
+                    <p className="text-xs font-medium text-gray-500">Choisissez le centre actif de ce tableau de bord.</p>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto px-2">
+                    {visibleCenterCodes.map((code) => {
+                      const isActive = code === centerCode?.toUpperCase();
+                      return (
+                        <button
+                          key={code}
+                          onClick={() => handleSwitchCenter(code)}
+                          className={`w-full rounded-2xl px-3 py-3 text-left transition-colors duration-200 ${
+                            isActive ? 'bg-emerald-50 text-emerald-950' : 'hover:bg-gray-50 text-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <span className={`h-3 w-3 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                              <div>
+                                <p className="text-sm font-extrabold">{code}</p>
+                                <p className="text-xs font-medium text-gray-500">{isActive ? 'Centre actif' : 'Accéder à ce centre'}</p>
+                              </div>
+                            </div>
+                            {isActive && <CheckIcon className="h-5 w-5 text-emerald-700" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {customUser?.isEmployer && (
+                    <>
+                      <div className="my-2 border-t border-gray-100" />
+                      <button
+                        onClick={() => {
+                          setIsCenterMenuOpen(false);
+                          setIsCreateCenterModalOpen(true);
+                        }}
+                        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-center rounded-full bg-emerald-900 px-4 py-3 text-sm font-extrabold text-white transition-colors hover:bg-emerald-800"
+                      >
+                        Créer un nouveau centre
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Profile Dropdown Menu */}
             {isProfileMenuOpen && (
@@ -3883,6 +4135,90 @@ export default function DashboardClient() {
             </>
           )}
         </div>
+
+        {/* Create Center Modal */}
+        {isCreateCenterModalOpen && (
+          <div className="fixed inset-0 z-[60] overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <div
+                className="fixed inset-0 bg-emerald-950/28 backdrop-blur-sm transition-opacity"
+                onClick={() => !isCreatingCenter && setIsCreateCenterModalOpen(false)}
+              />
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleCreateCenter();
+                }}
+                className="ga-modal-panel relative w-full max-w-lg bg-white"
+              >
+                <div className="ga-modal-header px-6 py-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-semibold text-white">Créer un nouveau centre</h3>
+                      <p className="mt-1 text-sm text-emerald-50/80">Ce centre sera ajouté à votre compte employeur.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => !isCreatingCenter && setIsCreateCenterModalOpen(false)}
+                      className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-5 px-6 py-6">
+                  <div>
+                    <label htmlFor="new-center-code" className="block text-sm font-extrabold text-gray-800">
+                      Code du centre
+                    </label>
+                    <input
+                      id="new-center-code"
+                      type="text"
+                      value={newCenterCode}
+                      onChange={(event) => setNewCenterCode(event.target.value.toUpperCase())}
+                      className="ga-input mt-2 block w-full px-4 py-3"
+                      placeholder="Ex.: GKC2"
+                      disabled={isCreatingCenter}
+                    />
+                    <p className="mt-2 text-xs font-medium text-gray-500">Le code doit être différent de vos autres centres.</p>
+                  </div>
+                  <div>
+                    <label htmlFor="new-center-title" className="block text-sm font-extrabold text-gray-800">
+                      Nom affiché
+                    </label>
+                    <input
+                      id="new-center-title"
+                      type="text"
+                      value={newCenterTitle}
+                      onChange={(event) => setNewCenterTitle(event.target.value)}
+                      className="ga-input mt-2 block w-full px-4 py-3"
+                      placeholder="Ex.: RTF GKC Est"
+                      disabled={isCreatingCenter}
+                    />
+                    <p className="mt-2 text-xs font-medium text-gray-500">Si ce champ est vide, GestApp utilisera le code du centre.</p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 bg-emerald-50/50 px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateCenterModalOpen(false)}
+                    className="ga-btn-secondary px-5 py-2.5 text-sm"
+                    disabled={isCreatingCenter}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="ga-btn-primary px-5 py-2.5 text-sm"
+                    disabled={isCreatingCenter}
+                  >
+                    {isCreatingCenter ? 'Création...' : 'Créer le centre'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Profile Modal */}
         {isProfileModalOpen && (
@@ -4379,8 +4715,8 @@ export default function DashboardClient() {
         </div>
 
         {/* Main content */}
-        <div className="lg:pl-64 pt-20 lg:pt-28">
-          <main className="max-w-[104rem] mx-auto py-10 px-4 sm:px-8 lg:px-12 relative z-0">
+        <div className={`lg:pl-64 pt-20 ${activeTab === 'accueil' ? 'lg:pt-20' : 'lg:pt-28'}`}>
+          <main className={`max-w-[104rem] mx-auto px-4 sm:px-8 lg:px-12 relative z-0 ${activeTab === 'accueil' ? 'py-5 sm:py-6' : 'py-10'}`}>
             {/* Overlay for mobile menu */}
             {isMobileMenuOpen && (
               <div
@@ -4511,6 +4847,63 @@ export default function DashboardClient() {
                     onClick={() => {
                       setIsConfirmCompleteModalOpen(false);
                       setTaskToComplete(null);
+                    }}
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {isConfirmUncompleteModalOpen && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" onClick={() => {
+                setIsConfirmUncompleteModalOpen(false);
+                setTaskToUncomplete(null);
+              }}>
+                <div className="absolute inset-0 bg-emerald-950 opacity-30"></div>
+              </div>
+
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+              <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-amber-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <ClockIcon className="h-6 w-6 text-amber-600" aria-hidden="true" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        Confirmation
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Êtes-vous sûr de vouloir exécuter cette action ?
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-emerald-50/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-amber-600 text-base font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={() => {
+                      if (taskToUncomplete) {
+                        handleUncompleteTask(taskToUncomplete);
+                      }
+                    }}
+                  >
+                    Oui, remettre à compléter
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-full border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={() => {
+                      setIsConfirmUncompleteModalOpen(false);
+                      setTaskToUncomplete(null);
                     }}
                   >
                     Annuler

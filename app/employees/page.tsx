@@ -53,9 +53,10 @@ const EmployeesPage = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | 'employer' | 'employee'>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [currentUserIsEmployer, setCurrentUserIsEmployer] = useState(false);
 
   useEffect(() => {
-    // Vérifier si l'utilisateur actuel est un employeur
+    // Vérifier l'utilisateur actuel et charger les employés du même centre.
     const checkAccess = async () => {
       if (!auth.currentUser) {
         router.push('/login');
@@ -65,15 +66,14 @@ const EmployeesPage = () => {
       const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
       const userData = userDoc.data();
       
-      if (!userData || !userData.isEmployer) {
+      if (!userData?.centerCode) {
         router.push('/dashboard');
         return;
       }
 
-      // Stocker l'ID de l'utilisateur actuel
       setCurrentUserId(auth.currentUser.uid);
+      setCurrentUserIsEmployer(!!userData.isEmployer);
 
-      // Charger les employés
       loadEmployees(userData.centerCode);
     };
 
@@ -84,7 +84,7 @@ const EmployeesPage = () => {
     // Filtrer les employés en fonction du terme de recherche et des filtres
     let filtered = employees;
     
-    // Exclure l'utilisateur actuel (l'employeur connecté) de la liste
+    // Exclure l'utilisateur actuel de la liste, employeur comme employé.
     filtered = filtered.filter(employee => employee.id !== currentUserId);
     
     // Filtre de recherche
@@ -206,13 +206,15 @@ const EmployeesPage = () => {
               </button>
               <h1 className="text-2xl font-bold text-gray-900">Liste des employés</h1>
             </div>
-            <button
-              onClick={() => router.push('/register')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
-            >
-              <UserPlusIcon className="h-5 w-5 mr-2" />
-              Ajouter un employé
-            </button>
+            {currentUserIsEmployer && (
+              <button
+                onClick={() => router.push('/register')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
+              >
+                <UserPlusIcon className="h-5 w-5 mr-2" />
+                Ajouter un employé
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -389,13 +391,15 @@ const EmployeesPage = () => {
                   Réinitialiser les filtres
                 </button>
               ) : (
-                <button
-                  onClick={() => router.push('/register')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
-                >
-                  <UserPlusIcon className="h-5 w-5 mr-2" />
-                  Ajouter un employé
-                </button>
+                currentUserIsEmployer && (
+                  <button
+                    onClick={() => router.push('/register')}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-emerald-800 hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-700 transition-colors duration-200"
+                  >
+                    <UserPlusIcon className="h-5 w-5 mr-2" />
+                    Ajouter un employé
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -459,7 +463,7 @@ const EmployeesPage = () => {
                         >
                           Voir le profil
                         </button>
-                        {!employee.isEmployer && (
+                        {currentUserIsEmployer && !employee.isEmployer && (
                           <button
                             onClick={() => {
                               setSelectedEmployee(employee);
@@ -599,7 +603,7 @@ const EmployeesPage = () => {
                 >
                   Fermer
                 </button>
-                {!selectedEmployee.isEmployer && (
+                {currentUserIsEmployer && !selectedEmployee.isEmployer && (
                   <button
                     type="button"
                     onClick={() => {
@@ -685,4 +689,4 @@ const EmployeesPage = () => {
   );
 };
 
-export default EmployeesPage; 
+export default EmployeesPage;

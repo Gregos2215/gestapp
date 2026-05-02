@@ -97,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         isEmployer,
         centerCode,
+        associatedCenters: [centerCode],
         firstName,
         lastName,
         isOnline: false,
@@ -176,12 +177,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function logout() {
     try {
       if (user) {
-        // Mettre à jour le statut hors ligne avant la déconnexion
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, {
-          isOnline: false,
-          lastOnlineAt: serverTimestamp()
-        });
+        try {
+          // Mettre à jour le statut hors ligne avant la déconnexion.
+          // Si Firestore refuse ou tarde, on ne bloque pas la déconnexion.
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+            isOnline: false,
+            lastOnlineAt: serverTimestamp()
+          });
+        } catch (statusError) {
+          console.warn('Unable to update offline status before logout:', statusError);
+        }
       }
       
       await signOut(auth);
