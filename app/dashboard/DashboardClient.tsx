@@ -643,6 +643,10 @@ export default function DashboardClient() {
     firstName: '',
     lastName: ''
   });
+  const [centerProfileEdits, setCenterProfileEdits] = useState({
+    title: '',
+    subtitle: ''
+  });
   const [isProfileModified, setIsProfileModified] = useState(false);
   const [userPreferences, setUserPreferences] = useState({
     emailNotifications: false,
@@ -679,9 +683,13 @@ export default function DashboardClient() {
         firstName: customUser.firstName || '',
         lastName: customUser.lastName || ''
       });
+      setCenterProfileEdits({
+        title: centerTitle || '',
+        subtitle: centerSubtitle || ''
+      });
       setIsProfileModified(false);
     }
-  }, [isProfileModalOpen, customUser]);
+  }, [isProfileModalOpen, customUser, centerTitle, centerSubtitle]);
 
   // Ajouter du code dans le useEffect qui détecte les paramètres d'URL pour également détecter le filtre
   useEffect(() => {
@@ -5349,9 +5357,12 @@ export default function DashboardClient() {
                         <div className="mt-1 relative rounded-xl border border-gray-200 bg-white overflow-hidden group hover:border-emerald-600 transition-colors duration-200">
                           <input
                             type="text"
-                            value={centerTitle}
+                            value={centerProfileEdits.title}
                             onChange={(e) => {
-                              setCenterTitle(e.target.value);
+                              setCenterProfileEdits((prev) => ({
+                                ...prev,
+                                title: e.target.value
+                              }));
                               setIsProfileModified(true);
                             }}
                             className="block w-full px-4 py-3 text-base font-medium text-gray-900 bg-transparent focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:border-transparent"
@@ -5374,9 +5385,12 @@ export default function DashboardClient() {
                         <div className="mt-1 relative rounded-xl border border-gray-200 bg-white overflow-hidden group hover:border-emerald-600 transition-colors duration-200">
                           <input
                             type="text"
-                            value={centerSubtitle}
+                            value={centerProfileEdits.subtitle}
                             onChange={(e) => {
-                              setCenterSubtitle(e.target.value);
+                              setCenterProfileEdits((prev) => ({
+                                ...prev,
+                                subtitle: e.target.value
+                              }));
                               setIsProfileModified(true);
                             }}
                             className="block w-full px-4 py-3 text-base font-medium text-gray-900 bg-transparent focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:border-transparent"
@@ -5418,12 +5432,20 @@ export default function DashboardClient() {
                               // Ne pas recréer automatiquement un centre supprimé depuis le dashboard.
                               const centerRef = doc(db, 'centers', customUser.centerCode);
                               const centerDoc = await getDoc(centerRef);
+                              const nextCenterTitle = centerProfileEdits.title.trim();
+                              const nextCenterSubtitle = centerProfileEdits.subtitle.trim();
                               
                               if (centerDoc.exists()) {
                                 // Mise à jour du document du centre existant
                                 await updateDoc(centerRef, {
-                                  title: centerTitle,
-                                  subtitle: centerSubtitle
+                                  title: nextCenterTitle,
+                                  subtitle: nextCenterSubtitle
+                                });
+                                setCenterTitle(nextCenterTitle);
+                                setCenterSubtitle(nextCenterSubtitle);
+                                setCenterProfileEdits({
+                                  title: nextCenterTitle,
+                                  subtitle: nextCenterSubtitle
                                 });
                               }
                               console.log('Centre mis à jour avec succès');
@@ -5454,7 +5476,14 @@ export default function DashboardClient() {
                       onClick={() => {
                         setIsProfileModalOpen(false);
                         setIsProfileModified(false);
-                        // Ne pas réinitialiser les champs à vide
+                        setProfileEdits({
+                          firstName: customUser?.firstName || '',
+                          lastName: customUser?.lastName || ''
+                        });
+                        setCenterProfileEdits({
+                          title: centerTitle || '',
+                          subtitle: centerSubtitle || ''
+                        });
                       }}
                       className={`w-full inline-flex justify-center items-center px-4 py-2.5 border text-sm font-medium rounded-lg transition-colors duration-200 ${
                         isProfileModified 
