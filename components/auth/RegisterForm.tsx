@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -40,14 +41,27 @@ export default function RegisterForm() {
       return;
     }
 
+    let pendingApprovalRedirectTimer: ReturnType<typeof window.setTimeout> | null = null;
+
     try {
       setLoading(true);
+      if (userType !== 'employer') {
+        pendingApprovalRedirectTimer = window.setTimeout(() => {
+          if (auth.currentUser) {
+            window.location.replace('/pending-approval');
+          }
+        }, 6000);
+      }
+
       if (!signUp) {
         toast.error('Service d\'inscription non disponible');
         return;
       }
 
       const result = await signUp(email, password, userType, code, firstName, lastName);
+      if (pendingApprovalRedirectTimer) {
+        window.clearTimeout(pendingApprovalRedirectTimer);
+      }
       toast.success('Compte créé avec succès !');
 
       if (result.pendingApproval) {
@@ -60,6 +74,9 @@ export default function RegisterForm() {
       console.error('Error:', error);
       toast.error(error instanceof Error ? error.message : 'Erreur lors de la création du compte.');
     } finally {
+      if (pendingApprovalRedirectTimer) {
+        window.clearTimeout(pendingApprovalRedirectTimer);
+      }
       setLoading(false);
     }
   }
