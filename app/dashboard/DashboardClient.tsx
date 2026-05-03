@@ -60,6 +60,7 @@ interface OnlineUser {
   isOnline: boolean;
   lastOnlineAt: Date | null;
   centerCode: string;
+  role: 'employee' | 'admin';
 }
 
 interface PendingAccountRequest {
@@ -208,7 +209,19 @@ function isExpectedFirestoreLogoutError(error: unknown): boolean {
 
 function handleFirestoreListenerError(context: string, error: unknown, toastMessage?: string) {
   if (isExpectedFirestoreLogoutError(error)) {
-    console.warn(context + ': listener stopped during logout or permission change.');
+    console.info(context + ': listener stopped during logout or permission change.');
+    return;
+  }
+
+  console.error(context, error);
+  if (toastMessage) {
+    toast.error(toastMessage);
+  }
+}
+
+function handleExpectedFirestoreActionError(context: string, error: unknown, toastMessage?: string) {
+  if (isExpectedFirestoreLogoutError(error)) {
+    console.info(context + ': action stopped during logout or permission change.');
     return;
   }
 
@@ -477,15 +490,24 @@ const renderEmployeeView = (
 const renderEmployerView = (
   onlineUsers: OnlineUser[],
   router: ReturnType<typeof useRouter>
-) => (
+) => {
+  const employeesCount = onlineUsers.filter((user) => user.role === 'employee').length;
+  const adminsCount = onlineUsers.filter((user) => user.role === 'admin').length;
+
+  return (
   <>
     {/* Section Liste des employés */}
     <div className="ga-card p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h2 className="text-xl font-extrabold text-gray-950">Liste de tous les employés</h2>
-        <span className="mr-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-          {onlineUsers.length} employés
-        </span>
+        <div className="flex flex-wrap gap-2">
+          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+            {employeesCount} employé{employeesCount > 1 ? 's' : ''}
+          </span>
+          <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">
+            {adminsCount} administrateur{adminsCount > 1 ? 's' : ''}
+          </span>
+        </div>
       </div>
       <div className="flex flex-col items-center justify-center p-6 bg-gradient-to-r from-emerald-50 to-white rounded-lg">
         <div className="w-16 h-16 mb-4 flex items-center justify-center bg-emerald-100 rounded-full">
@@ -557,7 +579,8 @@ const renderEmployerView = (
       </div>
     </div>
   </>
-);
+  );
+};
 
 export default function DashboardClient() {
   const { user, logout } = useAuth() || {};
@@ -609,6 +632,10 @@ export default function DashboardClient() {
   const [isJoinCenterModalOpen, setIsJoinCenterModalOpen] = useState(false);
   const [joinCenterCode, setJoinCenterCode] = useState('');
   const [isJoiningCenter, setIsJoiningCenter] = useState(false);
+  const [isDeleteCenterModalOpen, setIsDeleteCenterModalOpen] = useState(false);
+  const [deleteCenterCodes, setDeleteCenterCodes] = useState<string[]>([]);
+  const [deleteCenterConfirmation, setDeleteCenterConfirmation] = useState('');
+  const [isDeletingCenter, setIsDeletingCenter] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -735,25 +762,16 @@ export default function DashboardClient() {
                 if (centerData.title) setCenterTitle(centerData.title);
                 if (centerData.subtitle) setCenterSubtitle(centerData.subtitle);
               } else {
-                // Si le document n'existe pas, le créer avec des valeurs par défaut
-                console.log("Document du centre n'existe pas, création en cours...");
-                await setDoc(centerRef, {
-                  title: "Centre " + userData.centerCode,
-                  subtitle: "Informations du centre",
-                  createdAt: serverTimestamp()
-                });
                 setCenterTitle("Centre " + userData.centerCode);
                 setCenterSubtitle("Informations du centre");
               }
             } catch (error) {
-              console.error('Error fetching center document:', error);
-              // Ne pas afficher de toast pour ne pas perturber l'expérience utilisateur
+              handleExpectedFirestoreActionError('Error fetching center document', error);
             }
           }
         }
       } catch (error) {
-        console.error('Error fetching user info:', error);
-        toast.error('Erreur lors du chargement des données utilisateur');
+        handleExpectedFirestoreActionError('Error fetching user info', error, 'Erreur lors du chargement des données utilisateur');
       } finally {
         // Fin du chargement initial
         setLoading(false);
@@ -768,36 +786,93 @@ export default function DashboardClient() {
 
     console.log('Setting up employee listener for center:', centerCode);
 
-    const q = query(
+    const normalizedCenterCode = centerCode.trim().toUpperCase();
+    const usersByActiveCenterQuery = query(
       collection(db, 'users'),
-      where('centerCode', '==', centerCode),
-      where('isEmployer', '==', false)
+      where('activeCenters', 'array-contains', normalizedCenterCode)
+    );
+    const usersByLegacyCenterQuery = query(
+      collection(db, 'users'),
+      where('centerCode', '==', normalizedCenterCode)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      console.log('Received employee update, count:', snapshot.size);
+    let modernUsers: OnlineUser[] = [];
+    let legacyUsers: OnlineUser[] = [];
+
+    const normalizeUsers = (docs: Array<{ id: string; data: () => any }>) => {
       const users: OnlineUser[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.accountStatus !== 'pending_approval') {
-          users.push({
-            id: doc.id,
-            firstName: data.firstName || '',
-            lastName: data.lastName || '',
-            email: data.email,
-            isOnline: data.isOnline || false,
-            lastOnlineAt: data.lastOnlineAt ? data.lastOnlineAt.toDate() : null,
-            centerCode: data.centerCode
-          });
+      docs.forEach((userDoc) => {
+        const data = userDoc.data();
+        const activeCenters = Array.isArray(data.activeCenters)
+          ? data.activeCenters
+              .filter((code: unknown): code is string => typeof code === 'string' && code.trim() !== '')
+              .map((code: string) => code.trim().toUpperCase())
+          : data.accountStatus === 'active'
+            ? Array.from(new Set([
+                ...(Array.isArray(data.associatedCenters) ? data.associatedCenters : []),
+                data.centerCode
+              ].filter((code): code is string => typeof code === 'string' && code.trim() !== '').map((code) => code.trim().toUpperCase())))
+            : [];
+
+        if (data.accountStatus === 'pending_approval' && activeCenters.length === 0) {
+          return;
         }
+
+        if (!activeCenters.includes(normalizedCenterCode) && data.centerCode !== normalizedCenterCode) {
+          return;
+        }
+
+        const centerRoles = data.centerRoles && typeof data.centerRoles === 'object' ? data.centerRoles : {};
+        const centerRole = centerRoles[normalizedCenterCode] || data.role || (data.isEmployer ? 'employer' : 'employee');
+
+        if (centerRole === 'employer') {
+          return;
+        }
+
+        users.push({
+          id: userDoc.id,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email,
+          isOnline: data.isOnline || false,
+          lastOnlineAt: data.lastOnlineAt ? data.lastOnlineAt.toDate() : null,
+          centerCode: normalizedCenterCode,
+          role: centerRole === 'admin' ? 'admin' : 'employee'
+        });
       });
+      return users;
+    };
+
+    const publishUsers = () => {
+      const usersMap = new Map<string, OnlineUser>();
+      [...modernUsers, ...legacyUsers].forEach((onlineUser) => {
+        usersMap.set(onlineUser.id, onlineUser);
+      });
+      const users = Array.from(usersMap.values());
       console.log('Updated online users:', users);
       setOnlineUsers(users);
+    };
+
+    const unsubscribeModern = onSnapshot(usersByActiveCenterQuery, (snapshot) => {
+      console.log('Received modern employee update, count:', snapshot.size);
+      modernUsers = normalizeUsers(snapshot.docs);
+      publishUsers();
     }, (error) => {
       handleFirestoreListenerError('Error in employee listener', error, 'Erreur lors de la mise à jour des employés en ligne');
     });
 
-    return () => unsubscribe();
+    const unsubscribeLegacy = onSnapshot(usersByLegacyCenterQuery, (snapshot) => {
+      console.log('Received legacy employee update, count:', snapshot.size);
+      legacyUsers = normalizeUsers(snapshot.docs);
+      publishUsers();
+    }, (error) => {
+      handleFirestoreListenerError('Error in employee listener', error, 'Erreur lors de la mise à jour des employés en ligne');
+    });
+
+    return () => {
+      unsubscribeModern();
+      unsubscribeLegacy();
+    };
   }, [centerCode, userType]);
 
   useEffect(() => {
@@ -1104,8 +1179,7 @@ export default function DashboardClient() {
       setIsOnline(newStatus);
       toast.success(newStatus ? 'Vous êtes maintenant en ligne' : 'Vous êtes maintenant hors ligne');
     } catch (error) {
-      console.error('Error updating online status:', error);
-      toast.error('Erreur lors de la mise à jour du statut');
+      handleExpectedFirestoreActionError('Error updating online status', error, 'Erreur lors de la mise à jour du statut');
     }
   };
 
@@ -1119,8 +1193,7 @@ export default function DashboardClient() {
       toast.success('Déconnexion réussie');
       router.replace('/login');
     } catch (error) {
-      console.error('Error logging out:', error);
-      toast.error('Erreur lors de la déconnexion');
+      handleExpectedFirestoreActionError('Error logging out', error, 'Erreur lors de la déconnexion');
     }
   };
 
@@ -1210,6 +1283,84 @@ export default function DashboardClient() {
       toast.error('Impossible de créer le centre pour le moment');
     } finally {
       setIsCreatingCenter(false);
+    }
+  };
+
+  const openDeleteCenterModal = () => {
+    const centers = associatedCenters.length > 0 ? associatedCenters : [centerCode].filter(Boolean);
+    const normalizedCenters = Array.from(new Set(centers.map((code) => normalizeCenterCode(code)).filter(Boolean)));
+    setDeleteCenterCodes(centerCode ? [normalizeCenterCode(centerCode)] : normalizedCenters.slice(0, 1));
+    setDeleteCenterConfirmation('');
+    setIsDeleteCenterModalOpen(true);
+    setIsProfileMenuOpen(false);
+  };
+
+  const toggleDeleteCenterCode = (centerToToggle: string) => {
+    const normalizedCode = normalizeCenterCode(centerToToggle);
+    setDeleteCenterCodes((currentCodes) => {
+      if (currentCodes.includes(normalizedCode)) {
+        return currentCodes.filter((code) => code !== normalizedCode);
+      }
+
+      return [...currentCodes, normalizedCode];
+    });
+  };
+
+  const handleDeleteCenters = async () => {
+    if (!customUser?.uid || !canManageAccountApprovals) {
+      toast.error('Action réservée aux employeurs');
+      return;
+    }
+
+    const normalizedCodes = Array.from(new Set(deleteCenterCodes.map((code) => normalizeCenterCode(code)).filter(Boolean)));
+    if (normalizedCodes.length === 0) {
+      toast.error('Sélectionnez au moins un centre');
+      return;
+    }
+
+    if (deleteCenterConfirmation.trim().toUpperCase() !== 'SUPPRIMER') {
+      toast.error('Écrivez SUPPRIMER pour confirmer');
+      return;
+    }
+
+    setIsDeletingCenter(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        toast.error('Session expirée. Veuillez vous reconnecter.');
+        return;
+      }
+
+      const response = await fetch('/api/centers/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ centerCodes: normalizedCodes })
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        toast.error(result.error || 'Impossible de supprimer le centre');
+        return;
+      }
+
+      toast.success(normalizedCodes.length > 1 ? 'Centres supprimés avec succès' : 'Centre supprimé avec succès');
+      setIsDeleteCenterModalOpen(false);
+
+      if (result.accountDeleted) {
+        await auth.signOut().catch(() => undefined);
+        router.replace('/login');
+        return;
+      }
+
+      window.location.href = '/dashboard?tab=accueil';
+    } catch (error) {
+      console.error('Error deleting centers:', error);
+      toast.error('Erreur lors de la suppression du centre');
+    } finally {
+      setIsDeletingCenter(false);
     }
   };
 
@@ -2833,15 +2984,8 @@ export default function DashboardClient() {
         if (centerData.title) setCenterTitle(centerData.title);
         if (centerData.subtitle) setCenterSubtitle(centerData.subtitle);
       } else {
-        // Si le document n'existe pas, le créer avec des valeurs par défaut
-        console.log("Document du centre n'existe pas, création en cours...");
-        setDoc(centerRef, {
-          title: "Centre " + customUser.centerCode,
-          subtitle: "Informations du centre",
-          createdAt: serverTimestamp()
-        }).catch(error => {
-          console.error("Erreur lors de la création du document center:", error);
-        });
+        setCenterTitle("Centre " + customUser.centerCode);
+        setCenterSubtitle("Informations du centre");
       }
     }, (error) => {
       handleFirestoreListenerError('Error listening to center document', error);
@@ -2937,7 +3081,7 @@ export default function DashboardClient() {
         }
       }
     } catch (error) {
-      console.error('Erreur lors de la vérification des tâches en retard:', error);
+      handleExpectedFirestoreActionError('Erreur lors de la vérification des tâches en retard', error);
     }
   };
 
@@ -2975,8 +3119,7 @@ export default function DashboardClient() {
         setUserPreferences(prefs);
         setTempPreferences(prefs);
       } catch (error) {
-        console.error('Error loading user preferences:', error);
-        toast.error('Erreur lors du chargement des préférences');
+        handleExpectedFirestoreActionError('Error loading user preferences', error, 'Erreur lors du chargement des préférences');
       }
     };
 
@@ -4394,6 +4537,9 @@ export default function DashboardClient() {
   };
 
   const visibleCenterCodes = associatedCenters.length > 0 ? associatedCenters : [centerCode || 'GKC'];
+  const normalizedVisibleCenterCodes = Array.from(new Set(visibleCenterCodes.map((code) => normalizeCenterCode(code)).filter(Boolean)));
+  const remainingCentersAfterDeletion = normalizedVisibleCenterCodes.filter((code) => !deleteCenterCodes.includes(code));
+  const deleteWillRemoveCurrentEmployerAccount = canManageAccountApprovals && deleteCenterCodes.length > 0 && remainingCentersAfterDeletion.length === 0;
 
   if (loading) {
     return (
@@ -4550,6 +4696,18 @@ export default function DashboardClient() {
                       <p className="text-xs text-gray-500">Voir et modifier vos informations</p>
                     </div>
                   </button>
+                  {canManageAccountApprovals && (
+                    <button
+                      onClick={openDeleteCenterModal}
+                      className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-red-50 transition-colors duration-200 group"
+                    >
+                      <TrashIcon className="h-5 w-5 text-red-500" />
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-red-600">Supprimer votre centre</p>
+                        <p className="text-xs text-red-500">Effacer un centre définitivement</p>
+                      </div>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setIsSettingsModalOpen(true);
@@ -4713,6 +4871,18 @@ export default function DashboardClient() {
                       <p className="text-xs text-gray-500">Voir et modifier vos informations</p>
                     </div>
                   </button>
+                  {canManageAccountApprovals && (
+                    <button
+                      onClick={openDeleteCenterModal}
+                      className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-red-50 transition-colors duration-200 group"
+                    >
+                      <TrashIcon className="h-5 w-5 text-red-500" />
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-red-600">Supprimer votre centre</p>
+                        <p className="text-xs text-red-500">Effacer un centre définitivement</p>
+                      </div>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setIsSettingsModalOpen(true);
@@ -4903,6 +5073,118 @@ export default function DashboardClient() {
           </div>
         )}
 
+        {/* Delete Center Modal */}
+        {isDeleteCenterModalOpen && (
+          <div className="fixed inset-0 z-[60] overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <div
+                className="fixed inset-0 bg-emerald-950/35 backdrop-blur-sm transition-opacity"
+                onClick={() => !isDeletingCenter && setIsDeleteCenterModalOpen(false)}
+              />
+              <div className="ga-modal-panel relative w-full max-w-xl bg-white">
+                <div className="ga-modal-header px-6 py-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-semibold text-white">Supprimer un centre</h3>
+                      <p className="mt-1 text-sm text-emerald-50/80">Cette action efface définitivement les données du centre.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => !isDeletingCenter && setIsDeleteCenterModalOpen(false)}
+                      className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-5 px-6 py-6">
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+                    Les tâches, résidents, rapports, messages, alertes et associations de comptes liés aux centres sélectionnés seront supprimés.
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-sm font-extrabold text-gray-900">Centres à supprimer</p>
+                    <div className="space-y-2">
+                      {normalizedVisibleCenterCodes.map((code) => {
+                        const isSelected = deleteCenterCodes.includes(code);
+
+                        return (
+                          <button
+                            key={code}
+                            type="button"
+                            onClick={() => toggleDeleteCenterCode(code)}
+                            disabled={isDeletingCenter}
+                            className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
+                              isSelected
+                                ? 'border-red-300 bg-red-50 text-red-800'
+                                : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-extrabold">{code}</p>
+                                <p className="text-xs font-medium text-gray-500">
+                                  {code === normalizeCenterCode(centerCode) ? 'Centre actif' : 'Centre associé'}
+                                </p>
+                              </div>
+                              <span className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                                isSelected ? 'border-red-500 bg-red-600 text-white' : 'border-gray-300 text-transparent'
+                              }`}>
+                                <CheckIcon className="h-4 w-4" />
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {deleteWillRemoveCurrentEmployerAccount && (
+                    <div className="rounded-xl border border-red-300 bg-white px-4 py-3 text-sm font-semibold text-red-700">
+                      Vous supprimez tous vos centres actifs. Votre compte employeur sera aussi supprimé complètement.
+                    </div>
+                  )}
+
+                  <div>
+                    <label htmlFor="delete-center-confirmation" className="block text-sm font-extrabold text-gray-800">
+                      Confirmation
+                    </label>
+                    <input
+                      id="delete-center-confirmation"
+                      type="text"
+                      value={deleteCenterConfirmation}
+                      onChange={(event) => setDeleteCenterConfirmation(event.target.value)}
+                      className="ga-input mt-2 block w-full px-4 py-3"
+                      placeholder="Écrivez SUPPRIMER"
+                      disabled={isDeletingCenter}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 bg-emerald-50/50 px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsDeleteCenterModalOpen(false)}
+                    className="ga-btn-secondary px-5 py-2.5 text-sm"
+                    disabled={isDeletingCenter}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteCenters}
+                    className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+                    disabled={isDeletingCenter || deleteCenterCodes.length === 0 || deleteCenterConfirmation.trim().toUpperCase() !== 'SUPPRIMER'}
+                  >
+                    {isDeletingCenter ? 'Suppression...' : 'Supprimer définitivement'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Profile Modal */}
         {isProfileModalOpen && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -5016,7 +5298,7 @@ export default function DashboardClient() {
                           <div className="px-4 py-3 flex items-center">
                             <UserCircleIcon className="h-5 w-5 text-gray-400 mr-3" />
                             <p className="text-base font-medium text-gray-900">
-                              {customUser?.isEmployer ? 'Employeur' : 'Employé'}
+                              {customUser?.role === 'admin' ? 'Administrateur' : customUser?.isEmployer ? 'Employeur' : 'Employé'}
                             </p>
                           </div>
                         </div>
@@ -5133,7 +5415,7 @@ export default function DashboardClient() {
                             // Mise à jour du document du centre si l'utilisateur est un employeur
                             // et que les informations du centre ont été modifiées
                             if (customUser.isEmployer && customUser.centerCode) {
-                              // Vérifier si le document du centre existe et le créer si nécessaire
+                              // Ne pas recréer automatiquement un centre supprimé depuis le dashboard.
                               const centerRef = doc(db, 'centers', customUser.centerCode);
                               const centerDoc = await getDoc(centerRef);
                               
@@ -5142,13 +5424,6 @@ export default function DashboardClient() {
                                 await updateDoc(centerRef, {
                                   title: centerTitle,
                                   subtitle: centerSubtitle
-                                });
-                              } else {
-                                // Création du document du centre s'il n'existe pas
-                                await setDoc(centerRef, {
-                                  title: centerTitle,
-                                  subtitle: centerSubtitle,
-                                  createdAt: serverTimestamp()
                                 });
                               }
                               console.log('Centre mis à jour avec succès');

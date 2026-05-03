@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -17,7 +16,6 @@ export default function RegisterForm() {
   const [loading, setLoading] = useState(false);
   
   const { signUp } = useAuth() || {};
-  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,7 +55,7 @@ export default function RegisterForm() {
         return;
       }
 
-      router.push('/dashboard');
+      window.location.replace('/dashboard');
     } catch (error) {
       console.error('Error:', error);
       toast.error(error instanceof Error ? error.message : 'Erreur lors de la création du compte.');
@@ -212,7 +210,7 @@ export default function RegisterForm() {
                   className="ga-input relative block w-full px-4 py-3 placeholder-gray-400 sm:text-sm"
                   placeholder={userType === 'employer' ? 'Créer un code unique pour votre centre' : 'Entrer le code fourni par votre employeur'}
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  onChange={(e) => setCode(e.target.value.trimStart().toUpperCase())}
                 />
               </div>
             </div>

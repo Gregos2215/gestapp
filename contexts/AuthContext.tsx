@@ -41,6 +41,29 @@ function hasActiveCenter(userData: any) {
   return Array.isArray(userData?.activeCenters) && userData.activeCenters.length > 0;
 }
 
+function isExpectedPermissionError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+
+  const firebaseError = error as { code?: string; message?: string };
+  return firebaseError.code === 'permission-denied' ||
+    firebaseError.message?.includes('Missing or insufficient permissions') === true;
+}
+
+async function checkCenterExists(centerCode: string) {
+  const response = await fetch('/api/centers/availability', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ centerCode })
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.error || 'Impossible de vérifier le code du centre');
+  }
+
+  return Boolean(result.exists);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,6 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             toast.error('Compte utilisateur non trouvé');
           }
         } catch (error) {
+          if (isExpectedPermissionError(error)) {
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+
           console.error('Error fetching user data:', error);
           toast.error('Erreur lors de la récupération des données utilisateur');
         }
@@ -104,19 +133,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }];
       const pendingCenterCodes = isEmployer ? [] : [normalizedCenterCode];
 
+      if (!normalizedCenterCode) {
+        throw new Error('Veuillez entrer un code de centre');
+      }
+
+      const centerExists = await checkCenterExists(normalizedCenterCode);
+
+      if (isEmployer && centerExists) {
+        throw new Error('Ce code de centre existe déjà. Choisissez un code différent.');
+      }
+
+      if (!isEmployer && !centerExists) {
+        throw new Error('Code du centre invalide');
+      }
+
       isSigningUpRef.current = true;
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
       try {
-        if (!isEmployer) {
-          const centerDoc = await getDoc(doc(db, 'centers', normalizedCenterCode));
-          if (!centerDoc.exists()) {
-            throw new Error('Code du centre invalide');
-          }
+        const centerRef = doc(db, 'centers', normalizedCenterCode);
+        const centerRoles = isEmployer ? { [normalizedCenterCode]: 'employer' } : {};
+        if (isEmployer) {
+          await setDoc(centerRef, {
+            code: normalizedCenterCode,
+            title: `Centre ${normalizedCenterCode}`,
+            subtitle: 'Informations du centre',
+            ownerId: userCredential.user.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          }, { merge: true });
         }
 
         // Créer le document utilisateur dans Firestore
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
+        const userProfile = {
           email,
           role,
           accountStatus,
@@ -127,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           activeCenters,
           pendingCenterRequests,
           pendingCenterCodes,
-          centerRoles: isEmployer ? { [normalizedCenterCode]: 'employer' } : {},
+          centerRoles,
           firstName,
           lastName,
           isOnline: false,
@@ -136,7 +185,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           approvedAt: accountStatus === 'active' ? serverTimestamp() : null,
           approvedBy: null,
           createdAt: serverTimestamp()
-        });
+        };
+
+        await setDoc(doc(db, 'users', userCredential.user.uid), userProfile);
+
+        if (accountStatus === 'active') {
+          setUser({
+            ...userCredential.user,
+            ...userProfile,
+            approvalRequestedAt: null,
+            approvedAt: new Date(),
+            createdAt: new Date()
+          } as User);
+          setLoading(false);
+        }
       } catch (firestoreError) {
         isSigningUpRef.current = false;
         await deleteUser(userCredential.user).catch((deleteError) => {
@@ -260,7 +322,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             lastOnlineAt: serverTimestamp()
           });
         } catch (statusError) {
-          console.warn('Unable to update offline status before logout:', statusError);
+          if (!isExpectedPermissionError(statusError)) {
+            console.warn('Unable to update offline status before logout.');
+          }
         }
       }
       

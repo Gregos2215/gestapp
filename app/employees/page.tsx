@@ -226,7 +226,7 @@ const EmployeesPage = () => {
       if (!response.ok && result.code === 'firebase-admin-missing') {
         result = await removeEmployeeFromCenterLocally(selectedEmployee);
       } else if (!response.ok) {
-        toast.error(result.error || 'Impossible de supprimer cet employé');
+        toast.error(result.error || 'Impossible de supprimer ce compte');
         return;
       }
       
@@ -243,7 +243,7 @@ const EmployeesPage = () => {
       setSelectedEmployee(null);
     } catch (error) {
       console.error('Erreur lors de la suppression :', error);
-      toast.error('Impossible de supprimer cet employé');
+      toast.error('Impossible de supprimer ce compte');
     } finally {
       setDeleteLoading(false);
     }
@@ -255,7 +255,7 @@ const EmployeesPage = () => {
     const targetSnapshot = await getDoc(targetRef);
 
     if (!targetSnapshot.exists()) {
-      throw new Error('Compte employé introuvable');
+      throw new Error('Compte introuvable');
     }
 
     const targetData = targetSnapshot.data();
@@ -315,6 +315,10 @@ const EmployeesPage = () => {
       addSuffix: true,
       locale: fr
     });
+  };
+
+  const canEmployerRemoveMember = (employee: Employee) => {
+    return currentUserIsEmployer && employee.id !== currentUserId && employee.role !== 'employer';
   };
 
   // Statistiques
@@ -600,14 +604,14 @@ const EmployeesPage = () => {
                         >
                           Voir le profil
                         </button>
-                        {currentUserIsEmployer && !employee.isEmployer && (
+                        {canEmployerRemoveMember(employee) && (
                           <button
                             onClick={() => {
                               setSelectedEmployee(employee);
                               setShowDeleteModal(true);
                             }}
                             className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
-                            title="Supprimer l'employé"
+                            title="Supprimer ce compte"
                           >
                             <TrashIcon className="h-4 w-4" />
                           </button>
@@ -740,7 +744,7 @@ const EmployeesPage = () => {
                 >
                   Fermer
                 </button>
-                {currentUserIsEmployer && !selectedEmployee.isEmployer && (
+                {canEmployerRemoveMember(selectedEmployee) && (
                   <button
                     type="button"
                     onClick={() => {

@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!targetSnap.exists) {
-      return NextResponse.json({ error: 'Compte employé introuvable' }, { status: 404 });
+      return NextResponse.json({ error: 'Compte introuvable' }, { status: 404 });
     }
 
     const requester = requesterSnap.data();
@@ -139,6 +139,6 @@ export async function POST(request: NextRequest) {
     }
 
     console.error('Error removing center membership:', error);
-    return NextResponse.json({ error: 'Erreur lors de la suppression de l’employé du centre' }, { status: 500 });
+    return NextResponse.json({ error: 'Erreur lors de la suppression du compte du centre' }, { status: 500 });
   }
 }
