@@ -9,12 +9,12 @@ function getPrivateKey() {
 function ensureFirebaseAdminApp() {
   if (getApps().length) return;
 
-  const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const projectId = process.env.FIREBASE_PROJECT_ID || clientEmail?.split('@')[1]?.split('.')[0];
   const privateKey = getPrivateKey();
 
   if (!projectId || !clientEmail || !privateKey) {
-    throw new Error('Firebase Admin credentials are missing. Configure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.');
+    throw new Error('Firebase Admin credentials are missing. Configure FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.');
   }
 
   initializeApp({

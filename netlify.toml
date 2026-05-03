@@ -7,6 +7,9 @@
   ESLINT_NO_DEV_ERRORS = "true"
   ESLINT_NEXT_NO_DEV_ERRORS = "true"
   NODE_VERSION = "18"
+  # Firebase project IDs are public client configuration, not private credentials.
+  # Netlify otherwise matches FIREBASE_PROJECT_ID against the generated client bundle.
+  SECRETS_SCAN_OMIT_KEYS = "FIREBASE_PROJECT_ID"
 
 [[plugins]]
-  package = "@netlify/plugin-nextjs" 
+  package = "@netlify/plugin-nextjs"
