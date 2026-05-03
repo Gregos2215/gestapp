@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { 
   User,
   createUserWithEmailAndPassword,
+  deleteUser,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
@@ -16,17 +17,16 @@ import {
   setDoc, 
   updateDoc, 
   serverTimestamp,
-  collection,
-  query,
-  where,
-  getDocs
 } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+
+type AccountRole = 'employer' | 'employee' | 'admin';
+type AccountStatus = 'active' | 'pending_approval';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string, isEmployer: boolean, centerCode: string, firstName: string, lastName: string) => Promise<void>;
+  signUp: (email: string, password: string, role: AccountRole, centerCode: string, firstName: string, lastName: string) => Promise<{ pendingApproval: boolean }>;
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -37,9 +37,14 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+function hasActiveCenter(userData: any) {
+  return Array.isArray(userData?.activeCenters) && userData.activeCenters.length > 0;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const isSigningUpRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -47,8 +52,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
-            setUser({ ...user, ...userDoc.data() });
+            const userData = userDoc.data();
+            if (userData.accountStatus === 'pending_approval' && !hasActiveCenter(userData)) {
+              await signOut(auth);
+              setUser(null);
+            } else {
+              setUser({ ...user, ...userData });
+            }
           } else {
+            if (isSigningUpRef.current) {
+              setUser(null);
+              setLoading(false);
+              return;
+            }
+
             // Si l'utilisateur n'existe pas dans Firestore, le déconnecter
             await signOut(auth);
             setUser(null);
@@ -70,43 +87,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signUp(
     email: string,
     password: string,
-    isEmployer: boolean,
+    role: AccountRole,
     centerCode: string,
     firstName: string,
     lastName: string
   ) {
     try {
-      // Pour les employés, vérifier si le code du centre existe
-      if (!isEmployer) {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, 
-          where('centerCode', '==', centerCode),
-          where('isEmployer', '==', true)
-        );
-        const querySnapshot = await getDocs(q);
-        
-        if (querySnapshot.empty) {
-          throw new Error('Code du centre invalide');
+      const normalizedCenterCode = centerCode.trim().toUpperCase();
+      const isEmployer = role === 'employer';
+      const accountStatus: AccountStatus = isEmployer ? 'active' : 'pending_approval';
+      const activeCenters = isEmployer ? [normalizedCenterCode] : [];
+      const pendingCenterRequests = isEmployer ? [] : [{
+        centerCode: normalizedCenterCode,
+        role,
+        requestedAt: new Date()
+      }];
+      const pendingCenterCodes = isEmployer ? [] : [normalizedCenterCode];
+
+      isSigningUpRef.current = true;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+      try {
+        if (!isEmployer) {
+          const centerDoc = await getDoc(doc(db, 'centers', normalizedCenterCode));
+          if (!centerDoc.exists()) {
+            throw new Error('Code du centre invalide');
+          }
         }
+
+        // Créer le document utilisateur dans Firestore
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          email,
+          role,
+          accountStatus,
+          // Les administrateurs deviennent privilégiés seulement après approbation.
+          isEmployer,
+          centerCode: normalizedCenterCode,
+          associatedCenters: [normalizedCenterCode],
+          activeCenters,
+          pendingCenterRequests,
+          pendingCenterCodes,
+          centerRoles: isEmployer ? { [normalizedCenterCode]: 'employer' } : {},
+          firstName,
+          lastName,
+          isOnline: false,
+          lastOnlineAt: null,
+          approvalRequestedAt: accountStatus === 'pending_approval' ? serverTimestamp() : null,
+          approvedAt: accountStatus === 'active' ? serverTimestamp() : null,
+          approvedBy: null,
+          createdAt: serverTimestamp()
+        });
+      } catch (firestoreError) {
+        isSigningUpRef.current = false;
+        await deleteUser(userCredential.user).catch((deleteError) => {
+          console.warn('Unable to clean up auth user after Firestore signup failure:', deleteError);
+        });
+        throw firestoreError;
       }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Créer le document utilisateur dans Firestore
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        email,
-        isEmployer,
-        centerCode,
-        associatedCenters: [centerCode],
-        firstName,
-        lastName,
-        isOnline: false,
-        lastOnlineAt: null,
-        createdAt: serverTimestamp()
-      });
-
+      isSigningUpRef.current = false;
       toast.success('Compte créé avec succès');
+      if (accountStatus === 'pending_approval') {
+        void signOut(auth).catch((signOutError) => {
+          console.warn('Unable to sign out pending account immediately:', signOutError);
+        });
+      }
+
+      return { pendingApproval: accountStatus === 'pending_approval' };
     } catch (error) {
+      isSigningUpRef.current = false;
       console.error('Error in signUp:', error);
       if (error instanceof Error) {
         switch ((error as AuthError).code) {
@@ -135,10 +184,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
       // Vérifier si l'utilisateur existe dans Firestore
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      let userDoc;
+      try {
+        userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      } catch (readError) {
+        const firebaseError = readError as { code?: string };
+        if (firebaseError.code === 'permission-denied') {
+          void signOut(auth).catch((signOutError) => {
+            console.warn('Unable to sign out pending account after denied profile read:', signOutError);
+          });
+          throw new Error('PENDING_APPROVAL');
+        }
+        throw readError;
+      }
+
       if (!userDoc.exists()) {
         await signOut(auth);
         throw new Error('Compte utilisateur non trouvé');
+      }
+
+      const userData = userDoc.data();
+      if (userData.accountStatus === 'pending_approval' && !hasActiveCenter(userData)) {
+        await signOut(auth);
+        throw new Error('PENDING_APPROVAL');
       }
 
       // Mettre à jour uniquement l'horodatage de la dernière connexion
@@ -149,8 +217,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       toast.success('Connexion réussie');
     } catch (error) {
-      console.error('Error in signIn:', error);
       if (error instanceof Error) {
+        if (error.message === 'PENDING_APPROVAL') {
+          throw error;
+        }
+
+        console.error('Error in signIn:', error);
+
         switch ((error as AuthError).code) {
           case 'auth/invalid-credential':
             throw new Error('Email ou mot de passe incorrect');
@@ -170,6 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         }
       }
+      console.error('Error in signIn:', error);
       throw error;
     }
   }

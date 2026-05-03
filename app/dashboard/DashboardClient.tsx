@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, Timestamp, getDocs, orderBy, addDoc, writeBatch, deleteDoc, deleteField, limit, setDoc } from 'firebase/firestore';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import toast from 'react-hot-toast';
@@ -50,7 +50,7 @@ import MessageDetailModal from '@/components/messages/MessageDetailModal';
 // Enregistrer la locale française pour le DatePicker
 registerLocale('fr', fr);
 
-type Tab = 'accueil' | 'taches' | 'residents' | 'rapports' | 'messages' | 'alertes';
+type Tab = 'accueil' | 'taches' | 'residents' | 'rapports' | 'messages' | 'alertes' | 'approbations';
 
 interface OnlineUser {
   id: string;
@@ -62,9 +62,30 @@ interface OnlineUser {
   centerCode: string;
 }
 
+interface PendingAccountRequest {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: 'employee' | 'admin';
+  centerCode: string;
+  approvalRequestedAt?: any;
+}
+
 interface CustomUser extends Omit<FirebaseUser, 'delete' | 'reload'> {
   isEmployer: boolean;
+  role?: 'employer' | 'employee' | 'admin';
+  accountStatus?: 'active' | 'pending_approval';
   centerCode: string;
+  activeCenters?: string[];
+  associatedCenters?: string[];
+  pendingCenterCodes?: string[];
+  pendingCenterRequests?: Array<{
+    centerCode?: string;
+    role?: 'employee' | 'admin';
+    requestedAt?: unknown;
+  }>;
+  centerRoles?: Record<string, 'employer' | 'employee' | 'admin'>;
   firstName: string;
   lastName: string;
 }
@@ -175,6 +196,26 @@ function safeFirebaseDate(firebaseDate: any): Date | null {
     return new Date(firebaseDate);
   }
   return null;
+}
+
+function isExpectedFirestoreLogoutError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const firebaseError = error as { code?: string; message?: string };
+  return firebaseError.code === 'permission-denied' ||
+    firebaseError.message?.includes('Missing or insufficient permissions') === true;
+}
+
+function handleFirestoreListenerError(context: string, error: unknown, toastMessage?: string) {
+  if (isExpectedFirestoreLogoutError(error)) {
+    console.warn(context + ': listener stopped during logout or permission change.');
+    return;
+  }
+
+  console.error(context, error);
+  if (toastMessage) {
+    toast.error(toastMessage);
+  }
 }
 
 const getEmployeeNextTasks = (
@@ -531,6 +572,8 @@ export default function DashboardClient() {
 
   const [isOnline, setIsOnline] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [pendingAccountRequests, setPendingAccountRequests] = useState<PendingAccountRequest[]>([]);
+  const [isProcessingApproval, setIsProcessingApproval] = useState(false);
   const [centerCode, setCenterCode] = useState<string | null>(null);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -548,6 +591,8 @@ export default function DashboardClient() {
   const [residentFilter, setResidentFilter] = useState<'all' | 'male' | 'female'>('all');
   const router = useRouter();
   const customUser = user as CustomUser | null;
+  const canManageAccountApprovals = customUser?.role === 'employer' || (customUser?.isEmployer && !customUser?.role);
+  const canRequestAnotherCenter = customUser?.role === 'employee' || customUser?.role === 'admin';
   const [isCreateReportModalOpen, setIsCreateReportModalOpen] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
@@ -561,6 +606,9 @@ export default function DashboardClient() {
   const [newCenterCode, setNewCenterCode] = useState('');
   const [newCenterTitle, setNewCenterTitle] = useState('');
   const [isCreatingCenter, setIsCreatingCenter] = useState(false);
+  const [isJoinCenterModalOpen, setIsJoinCenterModalOpen] = useState(false);
+  const [joinCenterCode, setJoinCenterCode] = useState('');
+  const [isJoiningCenter, setIsJoiningCenter] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -611,7 +659,7 @@ export default function DashboardClient() {
   // Ajouter du code dans le useEffect qui détecte les paramètres d'URL pour également détecter le filtre
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['accueil', 'taches', 'residents', 'rapports', 'messages', 'alertes'].includes(tabParam)) {
+    if (tabParam && ['accueil', 'taches', 'residents', 'rapports', 'messages', 'alertes', 'approbations'].includes(tabParam)) {
       setActiveTab(tabParam as Tab);
       
       // Si l'onglet est 'taches', vérifier s'il y a un paramètre de filtre
@@ -645,22 +693,34 @@ export default function DashboardClient() {
           setCenterCode(userData.centerCode);
           setIsOnline(userData.isOnline || false);
 
-          const normalizedActiveCenter = typeof userData.centerCode === 'string' ? userData.centerCode.trim().toUpperCase() : '';
-          const savedCenters = Array.isArray(userData.associatedCenters)
+          const normalizedCurrentCenter = typeof userData.centerCode === 'string' ? userData.centerCode.trim().toUpperCase() : '';
+          const savedActiveCenters = Array.isArray(userData.activeCenters)
+            ? userData.activeCenters
+                .filter((code: unknown): code is string => typeof code === 'string' && code.trim() !== '')
+                .map((code: string) => code.trim().toUpperCase())
+            : [];
+          const savedAssociatedCenters = Array.isArray(userData.associatedCenters)
             ? userData.associatedCenters
                 .filter((code: unknown): code is string => typeof code === 'string' && code.trim() !== '')
                 .map((code: string) => code.trim().toUpperCase())
             : [];
-          const uniqueCenters = Array.from(new Set([normalizedActiveCenter, ...savedCenters].filter(Boolean)));
+          const uniqueCenters = savedActiveCenters.length > 0
+            ? Array.from(new Set(savedActiveCenters))
+            : Array.from(new Set([normalizedCurrentCenter, ...savedAssociatedCenters].filter(Boolean)));
           setAssociatedCenters(uniqueCenters);
 
           if (
             uniqueCenters.length > 0 &&
-            (!Array.isArray(userData.associatedCenters) ||
+            userData.accountStatus === 'active' &&
+            (!Array.isArray(userData.activeCenters) ||
+              userData.activeCenters.length !== uniqueCenters.length ||
+              uniqueCenters.some((code) => !userData.activeCenters.includes(code)) ||
+              !Array.isArray(userData.associatedCenters) ||
               userData.associatedCenters.length !== uniqueCenters.length ||
               uniqueCenters.some((code) => !userData.associatedCenters.includes(code)))
           ) {
             await updateDoc(doc(db, 'users', user.uid), {
+              activeCenters: uniqueCenters,
               associatedCenters: uniqueCenters
             });
           }
@@ -719,21 +779,22 @@ export default function DashboardClient() {
       const users: OnlineUser[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
-        users.push({
-          id: doc.id,
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-          email: data.email,
-          isOnline: data.isOnline || false,
-          lastOnlineAt: data.lastOnlineAt ? data.lastOnlineAt.toDate() : null,
-          centerCode: data.centerCode
-        });
+        if (data.accountStatus !== 'pending_approval') {
+          users.push({
+            id: doc.id,
+            firstName: data.firstName || '',
+            lastName: data.lastName || '',
+            email: data.email,
+            isOnline: data.isOnline || false,
+            lastOnlineAt: data.lastOnlineAt ? data.lastOnlineAt.toDate() : null,
+            centerCode: data.centerCode
+          });
+        }
       });
       console.log('Updated online users:', users);
       setOnlineUsers(users);
     }, (error) => {
-      console.error('Error in employee listener:', error);
-      toast.error('Erreur lors de la mise à jour des employés en ligne');
+      handleFirestoreListenerError('Error in employee listener', error, 'Erreur lors de la mise à jour des employés en ligne');
     });
 
     return () => unsubscribe();
@@ -756,8 +817,9 @@ export default function DashboardClient() {
     );
 
     const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-      console.log('[onSnapshot] Received update');
-      const tasksData: Task[] = [];
+      try {
+        console.log('[onSnapshot] Received update');
+        const tasksData: Task[] = [];
       
       // Récupérer tous les résidents en une seule fois
       const residentsRef = collection(db, 'residents');
@@ -811,11 +873,13 @@ export default function DashboardClient() {
         tasksData.push(taskData);
       });
       
-      console.log(`[onSnapshot] Processed ${tasksData.length} tasks.`);
-      setTasks(tasksData);
+        console.log(`[onSnapshot] Processed ${tasksData.length} tasks.`);
+        setTasks(tasksData);
+      } catch (error) {
+        handleFirestoreListenerError('[onSnapshot] Error while processing tasks', error, 'Erreur lors de la mise à jour des tâches.');
+      }
     }, (error) => {
-      console.error('[onSnapshot] Error:', error);
-      toast.error('Erreur lors de la mise à jour des tâches.');
+      handleFirestoreListenerError('[onSnapshot] Error', error, 'Erreur lors de la mise à jour des tâches.');
     });
 
     return () => {
@@ -823,6 +887,209 @@ export default function DashboardClient() {
       unsubscribe();
     };
   }, [customUser]);
+
+  useEffect(() => {
+    if (!centerCode || !canManageAccountApprovals) {
+      setPendingAccountRequests([]);
+      return;
+    }
+
+    const normalizeRequest = (requestDoc: any, data: any, pendingRequest?: any): PendingAccountRequest | null => {
+      const requestCenterCode = typeof pendingRequest?.centerCode === 'string'
+        ? pendingRequest.centerCode.trim().toUpperCase()
+        : typeof data.centerCode === 'string'
+          ? data.centerCode.trim().toUpperCase()
+          : '';
+
+      if (requestCenterCode !== centerCode) return null;
+
+      return {
+        id: requestDoc.id,
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        email: data.email || '',
+        role: pendingRequest?.role === 'admin' || data.role === 'admin' ? 'admin' : 'employee',
+        centerCode: requestCenterCode,
+        approvalRequestedAt: pendingRequest?.requestedAt || data.approvalRequestedAt
+      };
+    };
+
+    let modernRequests: PendingAccountRequest[] = [];
+    let legacyRequests: PendingAccountRequest[] = [];
+    const publishRequests = () => {
+      const requestMap = new Map<string, PendingAccountRequest>();
+      [...modernRequests, ...legacyRequests].forEach((request) => {
+        requestMap.set(`${request.id}:${request.centerCode}`, request);
+      });
+      setPendingAccountRequests(Array.from(requestMap.values()));
+    };
+
+    const modernPendingQuery = query(
+      collection(db, 'users'),
+      where('pendingCenterCodes', 'array-contains', centerCode)
+    );
+
+    const legacyPendingQuery = query(
+      collection(db, 'users'),
+      where('centerCode', '==', centerCode),
+      where('accountStatus', '==', 'pending_approval')
+    );
+
+    const unsubscribeModern = onSnapshot(modernPendingQuery, (snapshot) => {
+      modernRequests = [];
+      snapshot.docs.forEach((requestDoc) => {
+        const data = requestDoc.data();
+        const pendingCenterRequests = Array.isArray(data.pendingCenterRequests) ? data.pendingCenterRequests : [];
+        pendingCenterRequests.forEach((pendingRequest: any) => {
+          const request = normalizeRequest(requestDoc, data, pendingRequest);
+          if (request) modernRequests.push(request);
+        });
+      });
+      publishRequests();
+    }, (error) => {
+      handleFirestoreListenerError('Error loading pending account requests', error);
+    });
+
+    const unsubscribeLegacy = onSnapshot(legacyPendingQuery, (snapshot) => {
+      legacyRequests = snapshot.docs
+        .map((requestDoc) => normalizeRequest(requestDoc, requestDoc.data()))
+        .filter((request): request is PendingAccountRequest => request !== null);
+      publishRequests();
+    }, (error) => {
+      handleFirestoreListenerError('Error loading legacy pending account requests', error);
+    });
+
+    return () => {
+      unsubscribeModern();
+      unsubscribeLegacy();
+    };
+  }, [centerCode, canManageAccountApprovals]);
+
+  const handleAccountApproval = async (targetUid: string, action: 'approve' | 'reject') => {
+    const approvalCenterCode = centerCode;
+    if (!approvalCenterCode) {
+      toast.error('Aucun centre actif sélectionné.');
+      return;
+    }
+
+    const idToken = await auth.currentUser?.getIdToken();
+    if (!idToken) {
+      toast.error('Session expirée. Veuillez vous reconnecter.');
+      return;
+    }
+
+    try {
+      setIsProcessingApproval(true);
+      const response = await fetch('/api/account-approvals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ targetUid, action })
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        if (result.code === 'firebase-admin-missing') {
+          const request = pendingAccountRequests.find((pendingRequest) => pendingRequest.id === targetUid);
+          const targetRef = doc(db, 'users', targetUid);
+          const targetSnapshot = await getDoc(targetRef);
+
+          if (!targetSnapshot.exists()) {
+            toast.error('Demande introuvable');
+            return;
+          }
+
+          const targetData = targetSnapshot.data();
+          const activeCenters = Array.isArray(targetData.activeCenters)
+            ? targetData.activeCenters.filter((code: unknown): code is string => typeof code === 'string' && code.trim() !== '').map((code: string) => code.trim().toUpperCase())
+            : targetData.accountStatus === 'active'
+              ? Array.from(new Set([
+                  ...(Array.isArray(targetData.associatedCenters) ? targetData.associatedCenters : []),
+                  targetData.centerCode
+                ].filter((code): code is string => typeof code === 'string' && code.trim() !== '').map((code) => code.trim().toUpperCase())))
+              : [];
+          const pendingCenterRequests = Array.isArray(targetData.pendingCenterRequests)
+            ? targetData.pendingCenterRequests
+            : targetData.accountStatus === 'pending_approval' && targetData.centerCode
+              ? [{
+                  centerCode: targetData.centerCode,
+                  role: targetData.role === 'admin' ? 'admin' : 'employee',
+                  requestedAt: targetData.approvalRequestedAt
+                }]
+              : [];
+          const remainingRequests = pendingCenterRequests.filter((pendingRequest: any) => {
+            const requestCenter = typeof pendingRequest.centerCode === 'string' ? pendingRequest.centerCode.trim().toUpperCase() : '';
+            return requestCenter !== approvalCenterCode;
+          });
+          const remainingPendingCodes = remainingRequests
+            .map((pendingRequest: any) => typeof pendingRequest.centerCode === 'string' ? pendingRequest.centerCode.trim().toUpperCase() : '')
+            .filter(Boolean);
+
+          if (action === 'approve' && request) {
+            const nextActiveCenters = Array.from(new Set([...activeCenters, approvalCenterCode].filter((code): code is string => typeof code === 'string' && code.trim() !== '').map((code) => code.trim().toUpperCase())));
+            const centerRoles = {
+              ...(targetData.centerRoles && typeof targetData.centerRoles === 'object' ? targetData.centerRoles : {}),
+              [approvalCenterCode]: request.role
+            };
+            const primaryRole = Object.values(centerRoles).includes('admin') ? 'admin' : 'employee';
+
+            await updateDoc(targetRef, {
+              role: primaryRole,
+              accountStatus: 'active',
+              isEmployer: primaryRole === 'admin',
+              centerCode: activeCenters.length > 0 ? targetData.centerCode || approvalCenterCode : approvalCenterCode,
+              associatedCenters: Array.from(new Set([
+                ...(Array.isArray(targetData.associatedCenters) ? targetData.associatedCenters : []),
+                ...nextActiveCenters
+              ])),
+              activeCenters: nextActiveCenters,
+              pendingCenterRequests: remainingRequests,
+              pendingCenterCodes: remainingPendingCodes,
+              centerRoles,
+              approvedAt: serverTimestamp(),
+              approvedBy: customUser?.uid || null
+            });
+            toast.success('Compte activé avec succès');
+            return;
+          }
+
+          if (action === 'reject') {
+            if (activeCenters.length === 0) {
+              await deleteDoc(targetRef);
+              toast.success('Demande supprimée avec succès');
+              return;
+            }
+
+            await updateDoc(targetRef, {
+              accountStatus: 'active',
+              activeCenters,
+              associatedCenters: Array.from(new Set([
+                ...(Array.isArray(targetData.associatedCenters) ? targetData.associatedCenters : []),
+                ...activeCenters
+              ])),
+              pendingCenterRequests: remainingRequests,
+              pendingCenterCodes: remainingPendingCodes,
+              centerCode: targetData.centerCode || activeCenters[0],
+              updatedAt: serverTimestamp()
+            });
+            toast.success('Demande supprimée avec succès');
+            return;
+          }
+        }
+
+        toast.error(result.error || 'Impossible de traiter cette demande');
+        return;
+      }
+
+      toast.success(action === 'approve' ? 'Compte activé avec succès' : 'Demande supprimée avec succès');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erreur lors du traitement de la demande');
+    } finally {
+      setIsProcessingApproval(false);
+    }
+  };
 
   const toggleOnlineStatus = async () => {
     if (!user) return;
@@ -883,7 +1150,7 @@ export default function DashboardClient() {
   };
 
   const handleCreateCenter = async () => {
-    if (!customUser?.uid || !customUser.isEmployer) {
+    if (!customUser?.uid || !canManageAccountApprovals) {
       toast.error('Seuls les comptes employeurs peuvent créer un centre');
       return;
     }
@@ -925,6 +1192,11 @@ export default function DashboardClient() {
       await updateDoc(doc(db, 'users', customUser.uid), {
         centerCode: normalizedCode,
         associatedCenters: nextCenters,
+        activeCenters: nextCenters,
+        centerRoles: {
+          ...(customUser.centerRoles || {}),
+          [normalizedCode]: 'employer'
+        },
         updatedAt: serverTimestamp()
       });
 
@@ -938,6 +1210,134 @@ export default function DashboardClient() {
       toast.error('Impossible de créer le centre pour le moment');
     } finally {
       setIsCreatingCenter(false);
+    }
+  };
+
+  const handleJoinCenterRequest = async () => {
+    if (!customUser?.uid || !canRequestAnotherCenter) {
+      toast.error('Cette action est réservée aux employés et administrateurs');
+      return;
+    }
+
+    const normalizedCode = normalizeCenterCode(joinCenterCode);
+    if (!normalizedCode) {
+      toast.error('Veuillez entrer un code de centre');
+      return;
+    }
+
+    setIsJoiningCenter(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        toast.error('Session expirée. Veuillez vous reconnecter.');
+        return;
+      }
+
+      const response = await fetch('/api/center-join-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ centerCode: normalizedCode })
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        if (result.code === 'firebase-admin-missing') {
+          const centerSnapshot = await getDoc(doc(db, 'centers', normalizedCode));
+          if (!centerSnapshot.exists()) {
+            toast.error('Ce centre n’existe pas');
+            return;
+          }
+
+          const userRef = doc(db, 'users', customUser.uid);
+          const userSnapshot = await getDoc(userRef);
+          if (!userSnapshot.exists()) {
+            toast.error('Compte introuvable');
+            return;
+          }
+
+          const userData = userSnapshot.data();
+          const activeCenters = Array.isArray(userData.activeCenters)
+            ? userData.activeCenters
+                .filter((code: unknown): code is string => typeof code === 'string' && code.trim() !== '')
+                .map((code: string) => code.trim().toUpperCase())
+            : userData.accountStatus === 'active'
+              ? Array.from(new Set([
+                  ...(Array.isArray(userData.associatedCenters) ? userData.associatedCenters : []),
+                  userData.centerCode
+                ].filter((code): code is string => typeof code === 'string' && code.trim() !== '').map((code) => code.trim().toUpperCase())))
+              : [];
+
+          if (activeCenters.length === 0) {
+            toast.error('Votre compte doit déjà être actif dans au moins un centre');
+            return;
+          }
+
+          if (activeCenters.includes(normalizedCode)) {
+            toast.error('Votre compte est déjà associé à ce centre');
+            return;
+          }
+
+          const pendingCenterRequests = Array.isArray(userData.pendingCenterRequests)
+            ? userData.pendingCenterRequests
+            : userData.accountStatus === 'pending_approval' && userData.centerCode
+              ? [{
+                  centerCode: userData.centerCode,
+                  role: userData.role === 'admin' ? 'admin' : 'employee',
+                  requestedAt: userData.approvalRequestedAt
+                }]
+              : [];
+          const hasPendingRequest = pendingCenterRequests.some((pendingRequest: any) => {
+            const pendingCenterCode = typeof pendingRequest.centerCode === 'string' ? pendingRequest.centerCode.trim().toUpperCase() : '';
+            return pendingCenterCode === normalizedCode;
+          });
+
+          if (hasPendingRequest) {
+            toast.error('Une demande est déjà en attente pour ce centre');
+            return;
+          }
+
+          const requestedRole = customUser.role === 'admin' ? 'admin' : 'employee';
+          const nextPendingRequests = [
+            ...pendingCenterRequests,
+            {
+              centerCode: normalizedCode,
+              role: requestedRole,
+              requestedAt: new Date()
+            }
+          ];
+          const nextPendingCodes = Array.from(new Set(nextPendingRequests
+            .map((pendingRequest: any) => typeof pendingRequest.centerCode === 'string' ? pendingRequest.centerCode.trim().toUpperCase() : '')
+            .filter(Boolean)));
+
+          await updateDoc(userRef, {
+            accountStatus: 'active',
+            activeCenters,
+            pendingCenterRequests: nextPendingRequests,
+            pendingCenterCodes: nextPendingCodes,
+            updatedAt: serverTimestamp()
+          });
+
+          toast.success('Demande envoyée à l’employeur du centre');
+          setIsJoinCenterModalOpen(false);
+          setJoinCenterCode('');
+          return;
+        }
+
+        toast.error(result.error || 'Impossible d’envoyer la demande');
+        return;
+      }
+
+      toast.success('Demande envoyée à l’employeur du centre');
+      setIsJoinCenterModalOpen(false);
+      setJoinCenterCode('');
+    } catch (error) {
+      console.error('Error requesting center access:', error);
+      toast.error('Impossible d’envoyer la demande pour le moment');
+    } finally {
+      setIsJoiningCenter(false);
     }
   };
 
@@ -2331,8 +2731,7 @@ export default function DashboardClient() {
       });
       setReports(reportsData);
     }, (error) => {
-      console.error('Error loading reports:', error);
-      toast.error('Erreur lors du chargement des rapports');
+      handleFirestoreListenerError('Error loading reports', error, 'Erreur lors du chargement des rapports');
     });
 
     return () => unsubscribe();
@@ -2408,14 +2807,14 @@ export default function DashboardClient() {
             await deleteDoc(doc(db, 'alerts', alert.id));
           }
         } catch (error) {
-          console.error(`[loadAlerts] Erreur lors de la vérification de la tâche ${taskId}:`, error);
+          handleFirestoreListenerError(`[loadAlerts] Erreur lors de la vérification de la tâche ${taskId}`, error);
         }
       }
       
       console.log('[loadAlerts] Alertes validées et chargées:', finalAlertsData.length);
       setAlerts(finalAlertsData);
     }, (error) => {
-      console.error('[loadAlerts] Erreur lors du chargement des alertes:', error);
+      handleFirestoreListenerError('[loadAlerts] Erreur lors du chargement des alertes', error);
     });
 
     return () => unsubscribe();
@@ -2445,7 +2844,7 @@ export default function DashboardClient() {
         });
       }
     }, (error) => {
-      console.error('Error listening to center document:', error);
+      handleFirestoreListenerError('Error listening to center document', error);
     });
     
     return () => unsubscribe();
@@ -2489,8 +2888,7 @@ export default function DashboardClient() {
       setPinnedMessages(pinnedMessagesData);
       console.log('[loadMessages] Messages chargés:', messagesData.length);
     }, (error) => {
-      console.error('[loadMessages] Erreur lors du chargement des messages:', error);
-      toast.error('Erreur lors du chargement des messages');
+      handleFirestoreListenerError('[loadMessages] Erreur lors du chargement des messages', error, 'Erreur lors du chargement des messages');
     });
     
     return () => unsubscribe();
@@ -3564,7 +3962,7 @@ export default function DashboardClient() {
             )}
 
             {/* Création de nouveau message */}
-            {customUser?.isEmployer && (
+            {(customUser?.role === 'employer' || (customUser?.isEmployer && !customUser?.role)) && (
               <div className="ga-card p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Nouveau message</h3>
                 <div className="space-y-4">
@@ -3778,6 +4176,72 @@ export default function DashboardClient() {
             </div>
           </div>
         );
+      case 'approbations':
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-3xl font-extrabold text-gray-950">Comptes en attente d’approbation</h2>
+                <p className="mt-1 text-sm text-gray-500">Demandes associées au centre actif {centerCode || ''}.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveTab('accueil');
+                  router.push('/dashboard?tab=accueil');
+                }}
+                className="ga-btn-secondary px-5 py-2.5 text-sm"
+              >
+                Retour à l’accueil
+              </button>
+            </div>
+
+            {pendingAccountRequests.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4">
+                {pendingAccountRequests.map((request) => (
+                  <div key={request.id} className="ga-card-flat border border-gray-200 p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-lg font-extrabold text-gray-950">{request.firstName} {request.lastName}</h3>
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                            {request.role === 'admin' ? 'Administrateur' : 'Employé'}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-600">{request.email}</p>
+                        <p className="mt-2 text-xs text-gray-500">
+                          Demande reçue {safeFirebaseDate(request.approvalRequestedAt)?.toLocaleString('fr-CA') || 'récemment'}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <button
+                          onClick={() => handleAccountApproval(request.id, 'approve')}
+                          disabled={isProcessingApproval}
+                          className="ga-btn-primary px-5 py-2.5 text-sm disabled:opacity-60"
+                        >
+                          Activer le compte
+                        </button>
+                        <button
+                          onClick={() => handleAccountApproval(request.id, 'reject')}
+                          disabled={isProcessingApproval}
+                          className="rounded-full border border-red-200 bg-white px-5 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+                        >
+                          Supprimer la demande
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="ga-card p-10 text-center">
+                <UserGroupIcon className="mx-auto h-12 w-12 text-gray-300" />
+                <h3 className="mt-4 text-lg font-extrabold text-gray-950">Aucune demande en attente</h3>
+                <p className="mt-2 text-sm text-gray-500">Les nouveaux comptes employés et administrateurs apparaîtront ici.</p>
+              </div>
+            )}
+          </div>
+        );
+
       case 'alertes':
         return (
           <div className="space-y-6">
@@ -3834,6 +4298,26 @@ export default function DashboardClient() {
                               if (report) {
                                 setSelectedReport(report);
                                 setIsReportDetailModalOpen(true);
+                              }
+                            } else if (alert.type === 'message_created') {
+                              setActiveTab('messages');
+                              router.push('/dashboard?tab=messages');
+
+                              const existingMessage = messages.find(message => message.id === alert.relatedId);
+                              if (existingMessage) {
+                                setSelectedMessage(existingMessage);
+                                setIsMessageDetailModalOpen(true);
+                              } else {
+                                const messageDoc = await getDoc(doc(db, 'messages', alert.relatedId));
+                                if (messageDoc.exists()) {
+                                  setSelectedMessage({
+                                    id: messageDoc.id,
+                                    ...messageDoc.data()
+                                  } as Message);
+                                  setIsMessageDetailModalOpen(true);
+                                } else {
+                                  toast.error("Ce message n'existe plus.");
+                                }
                               }
                             }
                           }
@@ -4000,7 +4484,7 @@ export default function DashboardClient() {
                       );
                     })}
                   </div>
-                  {customUser?.isEmployer && (
+                  {canManageAccountApprovals && (
                     <>
                       <div className="my-2 border-t border-gray-100" />
                       <button
@@ -4011,6 +4495,33 @@ export default function DashboardClient() {
                         className="mx-2 flex w-[calc(100%-1rem)] items-center justify-center rounded-full bg-emerald-900 px-4 py-3 text-sm font-extrabold text-white transition-colors hover:bg-emerald-800"
                       >
                         Créer un nouveau centre
+                      </button>
+                      {canManageAccountApprovals && (
+                        <button
+                          onClick={() => {
+                            setIsCenterMenuOpen(false);
+                            setActiveTab('approbations');
+                            router.push('/dashboard?tab=approbations');
+                          }}
+                          className="mx-2 mt-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-full border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-extrabold text-amber-900 transition-colors hover:bg-amber-100"
+                        >
+                          <span>Voir les comptes en attente d’approbation</span>
+                          <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs text-white">{pendingAccountRequests.length}</span>
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {canRequestAnotherCenter && (
+                    <>
+                      <div className="my-2 border-t border-gray-100" />
+                      <button
+                        onClick={() => {
+                          setIsCenterMenuOpen(false);
+                          setIsJoinCenterModalOpen(true);
+                        }}
+                        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-900 transition-colors hover:bg-emerald-100"
+                      >
+                        Inscription à un autre centre
                       </button>
                     </>
                   )}
@@ -4071,69 +4582,167 @@ export default function DashboardClient() {
           </div>
         </div>
 
-        {/* Profile Menu Button - Mobile */}
-        <div className="fixed top-0 right-0 z-50 p-4 lg:hidden">
-          <button
-            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-            className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-900 to-emerald-700 flex items-center justify-center text-white font-medium text-sm shadow-sm hover:shadow-md transition-all duration-200"
-          >
-            {customUser?.firstName?.charAt(0)}{customUser?.lastName?.charAt(0)}
-          </button>
+        {/* Profile and Center Menu Buttons - Mobile */}
+        <div className="fixed top-0 right-0 z-[60] flex items-center gap-3 px-4 py-2 lg:hidden">
+          <div className="relative z-10">
+            <button
+              onClick={() => {
+                setIsCenterMenuOpen(!isCenterMenuOpen);
+                setIsProfileMenuOpen(false);
+              }}
+              className="flex h-9 items-center gap-2 rounded-full border border-emerald-100 bg-white/95 px-3 text-left backdrop-blur transition-all duration-200 hover:bg-emerald-50"
+            >
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span className="max-w-[6rem] truncate text-sm font-extrabold text-emerald-950">{centerCode || 'GKC'}</span>
+              <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+            </button>
 
-          {/* Mobile Profile Menu */}
-          {isProfileMenuOpen && (
-            <>
-              <div
-                className="fixed inset-0 bg-white/50 backdrop-blur-sm z-40"
-                onClick={() => setIsProfileMenuOpen(false)}
-              />
-              <div className="absolute right-4 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-medium text-gray-900">{customUser?.firstName} {customUser?.lastName}</p>
-                  <p className="text-xs text-gray-500">{customUser?.email}</p>
+            {isCenterMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40 bg-white/50 backdrop-blur-sm"
+                  onClick={() => setIsCenterMenuOpen(false)}
+                />
+                <div className="fixed left-3 right-3 top-14 z-50 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-3xl border border-gray-200 bg-white p-3 shadow-xl">
+                  <div className="px-2 pb-3">
+                    <p className="text-sm font-extrabold text-gray-950">Centre actif</p>
+                    <p className="text-xs font-medium text-gray-500">Choisissez le centre de ce tableau de bord.</p>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {visibleCenterCodes.map((code) => {
+                      const isActive = code === centerCode?.toUpperCase();
+                      return (
+                        <button
+                          key={code}
+                          onClick={() => handleSwitchCenter(code)}
+                          className={`w-full rounded-2xl px-3 py-3 text-left transition-colors duration-200 ${
+                            isActive ? 'bg-emerald-50 text-emerald-950' : 'hover:bg-gray-50 text-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <span className={`h-3 w-3 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                              <div>
+                                <p className="text-sm font-extrabold">{code}</p>
+                                <p className="text-xs font-medium text-gray-500">{isActive ? 'Centre actif' : 'Accéder à ce centre'}</p>
+                              </div>
+                            </div>
+                            {isActive && <CheckIcon className="h-5 w-5 text-emerald-700" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {canManageAccountApprovals && (
+                    <>
+                      <div className="my-2 border-t border-gray-100" />
+                      <button
+                        onClick={() => {
+                          setIsCenterMenuOpen(false);
+                          setIsCreateCenterModalOpen(true);
+                        }}
+                        className="flex w-full items-center justify-center rounded-full bg-emerald-900 px-4 py-3 text-center text-sm font-extrabold text-white transition-colors hover:bg-emerald-800"
+                      >
+                        Créer un nouveau centre
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsCenterMenuOpen(false);
+                          setActiveTab('approbations');
+                          router.push('/dashboard?tab=approbations');
+                        }}
+                        className="mt-2 flex w-full items-center justify-between gap-3 rounded-full border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-extrabold text-amber-900 transition-colors hover:bg-amber-100"
+                      >
+                        <span>Comptes en attente</span>
+                        <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs text-white">{pendingAccountRequests.length}</span>
+                      </button>
+                    </>
+                  )}
+                  {canRequestAnotherCenter && (
+                    <>
+                      <div className="my-2 border-t border-gray-100" />
+                      <button
+                        onClick={() => {
+                          setIsCenterMenuOpen(false);
+                          setIsJoinCenterModalOpen(true);
+                        }}
+                        className="flex w-full items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-900 transition-colors hover:bg-emerald-100"
+                      >
+                        Inscription à un autre centre
+                      </button>
+                    </>
+                  )}
                 </div>
-                <button
-                  onClick={() => {
-                    setIsProfileModalOpen(true);
-                    setIsProfileMenuOpen(false);
-                  }}
-                  className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors duration-200 group"
-                >
-                  <UserCircleIcon className="h-5 w-5 text-gray-400 group-hover:text-emerald-700" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Profil</p>
-                    <p className="text-xs text-gray-500">Voir et modifier vos informations</p>
+              </>
+            )}
+          </div>
+
+          <div className="relative z-20 rounded-full bg-white p-0.5">
+            <button
+              onClick={() => {
+                setIsProfileMenuOpen(!isProfileMenuOpen);
+                setIsCenterMenuOpen(false);
+              }}
+              className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-900 to-emerald-700 flex items-center justify-center text-white font-medium text-sm shadow-sm transition-all duration-200"
+            >
+              {customUser?.firstName?.charAt(0)}{customUser?.lastName?.charAt(0)}
+            </button>
+
+            {/* Mobile Profile Menu */}
+            {isProfileMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 bg-white/50 backdrop-blur-sm z-40"
+                  onClick={() => setIsProfileMenuOpen(false)}
+                />
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900">{customUser?.firstName} {customUser?.lastName}</p>
+                    <p className="text-xs text-gray-500">{customUser?.email}</p>
                   </div>
-                </button>
-                <button
-                  onClick={() => {
-                    setIsSettingsModalOpen(true);
-                    setIsProfileMenuOpen(false);
-                  }}
-                  className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors duration-200 group"
-                >
-                  <Cog6ToothIcon className="h-5 w-5 text-gray-400 group-hover:text-emerald-700" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Paramètres</p>
-                    <p className="text-xs text-gray-500">Configurer l&apos;application</p>
-                  </div>
-                </button>
-                <div className="border-t border-gray-100 my-1" />
-                <button
-                  onClick={handleLogout}
-                  className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-red-50 text-red-600 transition-colors duration-200 group"
-                >
-                  <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  <div className="text-left">
-                    <p className="text-sm font-medium">Déconnexion</p>
-                    <p className="text-xs text-red-500">Quitter l&apos;application</p>
-                  </div>
-                </button>
-              </div>
-            </>
-          )}
+                  <button
+                    onClick={() => {
+                      setIsProfileModalOpen(true);
+                      setIsProfileMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors duration-200 group"
+                  >
+                    <UserCircleIcon className="h-5 w-5 text-gray-400 group-hover:text-emerald-700" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Profil</p>
+                      <p className="text-xs text-gray-500">Voir et modifier vos informations</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsSettingsModalOpen(true);
+                      setIsProfileMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors duration-200 group"
+                  >
+                    <Cog6ToothIcon className="h-5 w-5 text-gray-400 group-hover:text-emerald-700" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Paramètres</p>
+                      <p className="text-xs text-gray-500">Configurer l&apos;application</p>
+                    </div>
+                  </button>
+                  <div className="border-t border-gray-100 my-1" />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-red-50 text-red-600 transition-colors duration-200 group"
+                  >
+                    <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Déconnexion</p>
+                      <p className="text-xs text-red-500">Quitter l&apos;application</p>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Create Center Modal */}
@@ -4213,6 +4822,80 @@ export default function DashboardClient() {
                     disabled={isCreatingCenter}
                   >
                     {isCreatingCenter ? 'Création...' : 'Créer le centre'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Join Center Modal */}
+        {isJoinCenterModalOpen && (
+          <div className="fixed inset-0 z-[60] overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <div
+                className="fixed inset-0 bg-emerald-950/28 backdrop-blur-sm transition-opacity"
+                onClick={() => !isJoiningCenter && setIsJoinCenterModalOpen(false)}
+              />
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleJoinCenterRequest();
+                }}
+                className="ga-modal-panel relative w-full max-w-lg bg-white"
+              >
+                <div className="ga-modal-header px-6 py-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-semibold text-white">Inscription à un autre centre</h3>
+                      <p className="mt-1 text-sm text-emerald-50/80">Une demande sera envoyée à l’employeur du centre.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => !isJoiningCenter && setIsJoinCenterModalOpen(false)}
+                      className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-5 px-6 py-6">
+                  <div>
+                    <label htmlFor="join-center-code" className="block text-sm font-extrabold text-gray-800">
+                      Code du centre
+                    </label>
+                    <input
+                      id="join-center-code"
+                      type="text"
+                      value={joinCenterCode}
+                      onChange={(event) => setJoinCenterCode(event.target.value.toUpperCase())}
+                      className="ga-input mt-2 block w-full px-4 py-3"
+                      placeholder="Ex.: ABC"
+                      disabled={isJoiningCenter}
+                    />
+                    <p className="mt-2 text-xs font-medium text-gray-500">
+                      Votre rôle demandé sera le même que votre rôle actuel.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 bg-emerald-50/50 px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsJoinCenterModalOpen(false);
+                      setJoinCenterCode('');
+                    }}
+                    className="ga-btn-secondary px-5 py-2.5 text-sm"
+                    disabled={isJoiningCenter}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="ga-btn-primary px-5 py-2.5 text-sm"
+                    disabled={isJoiningCenter}
+                  >
+                    {isJoiningCenter ? 'Envoi...' : 'Envoyer la demande'}
                   </button>
                 </div>
               </form>
@@ -4745,12 +5428,7 @@ export default function DashboardClient() {
                 GestApp
               </span>
             </button>
-            <button
-              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-              className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-900 to-emerald-700 flex items-center justify-center text-white font-medium text-sm shadow-sm hover:shadow-md transition-all duration-200"
-            >
-              {customUser?.firstName?.charAt(0)}{customUser?.lastName?.charAt(0)}
-            </button>
+            <div className="w-48" aria-hidden="true" />
           </div>
         </div>
 

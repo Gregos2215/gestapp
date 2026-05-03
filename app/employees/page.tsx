@@ -8,8 +8,10 @@ import {
   where, 
   getDocs, 
   doc, 
-  getDoc, 
-  deleteDoc
+  getDoc,
+  deleteDoc,
+  updateDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { 
@@ -35,6 +37,12 @@ interface Employee {
   avatarUrl: string;
   centerCode: string;
   isEmployer: boolean;
+  role?: 'employer' | 'employee' | 'admin';
+  activeCenters?: string[];
+  associatedCenters?: string[];
+  centerRoles?: Record<string, 'employer' | 'employee' | 'admin'>;
+  pendingCenterRequests?: Array<{ centerCode?: string; role?: 'employee' | 'admin'; requestedAt?: unknown }>;
+  pendingCenterCodes?: string[];
   isOnline?: boolean;
   lastOnlineAt?: Date;
 }
@@ -54,6 +62,7 @@ const EmployeesPage = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [currentUserIsEmployer, setCurrentUserIsEmployer] = useState(false);
+  const [currentCenterCode, setCurrentCenterCode] = useState('');
 
   useEffect(() => {
     // Vérifier l'utilisateur actuel et charger les employés du même centre.
@@ -73,6 +82,7 @@ const EmployeesPage = () => {
 
       setCurrentUserId(auth.currentUser.uid);
       setCurrentUserIsEmployer(!!userData.isEmployer);
+      setCurrentCenterCode(userData.centerCode);
 
       loadEmployees(userData.centerCode);
     };
@@ -118,28 +128,63 @@ const EmployeesPage = () => {
   const loadEmployees = async (centerCode: string) => {
     try {
       setLoading(true);
-      const usersQuery = query(
+      const normalizedCenterCode = centerCode.trim().toUpperCase();
+      const modernUsersQuery = query(
         collection(db, 'users'),
-        where('centerCode', '==', centerCode)
+        where('activeCenters', 'array-contains', normalizedCenterCode)
+      );
+      const legacyUsersQuery = query(
+        collection(db, 'users'),
+        where('centerCode', '==', normalizedCenterCode)
       );
       
-      const querySnapshot = await getDocs(usersQuery);
-      const employeesList: Employee[] = [];
+      const [modernSnapshot, legacySnapshot] = await Promise.all([
+        getDocs(modernUsersQuery),
+        getDocs(legacyUsersQuery)
+      ]);
+      const employeesMap = new Map<string, Employee>();
       
-      querySnapshot.forEach((doc) => {
+      [...modernSnapshot.docs, ...legacySnapshot.docs].forEach((doc) => {
         const userData = doc.data();
-        employeesList.push({
+        const activeCenters = Array.isArray(userData.activeCenters)
+          ? userData.activeCenters.filter((code: unknown): code is string => typeof code === 'string' && code.trim() !== '').map((code: string) => code.trim().toUpperCase())
+          : userData.accountStatus === 'active'
+            ? Array.from(new Set([
+                ...(Array.isArray(userData.associatedCenters) ? userData.associatedCenters : []),
+                userData.centerCode
+              ].filter((code): code is string => typeof code === 'string' && code.trim() !== '').map((code) => code.trim().toUpperCase())))
+            : [];
+
+        if (userData.accountStatus === 'pending_approval' && activeCenters.length === 0) {
+          return;
+        }
+
+        if (!activeCenters.includes(normalizedCenterCode) && userData.centerCode !== normalizedCenterCode) {
+          return;
+        }
+
+        const centerRoles = userData.centerRoles && typeof userData.centerRoles === 'object' ? userData.centerRoles : {};
+        const centerRole = centerRoles[normalizedCenterCode] || userData.role || (userData.isEmployer ? 'employer' : 'employee');
+        employeesMap.set(doc.id, {
           id: doc.id,
           firstName: userData.firstName || '',
           lastName: userData.lastName || '',
           email: userData.email || '',
           avatarUrl: userData.avatarUrl || '',
-          centerCode: userData.centerCode || '',
-          isEmployer: userData.isEmployer || false,
+          centerCode: normalizedCenterCode,
+          isEmployer: centerRole === 'employer' || centerRole === 'admin',
+          role: centerRole === 'admin' ? 'admin' : centerRole === 'employer' ? 'employer' : 'employee',
+          activeCenters,
+          associatedCenters: Array.isArray(userData.associatedCenters) ? userData.associatedCenters : [],
+          centerRoles,
+          pendingCenterRequests: Array.isArray(userData.pendingCenterRequests) ? userData.pendingCenterRequests : [],
+          pendingCenterCodes: Array.isArray(userData.pendingCenterCodes) ? userData.pendingCenterCodes : [],
           isOnline: userData.isOnline || false,
           lastOnlineAt: userData.lastOnlineAt ? new Date(userData.lastOnlineAt.toDate()) : undefined
         });
       });
+
+      const employeesList = Array.from(employeesMap.values());
       
       setEmployees(employeesList);
       setFilteredEmployees(employeesList);
@@ -153,18 +198,47 @@ const EmployeesPage = () => {
 
   const handleDeleteEmployee = async () => {
     if (!selectedEmployee) return;
+    if (!currentCenterCode) {
+      toast.error('Aucun centre actif sélectionné.');
+      return;
+    }
     
     try {
       setDeleteLoading(true);
-      
-      // Supprimer l'utilisateur de Firestore
-      await deleteDoc(doc(db, 'users', selectedEmployee.id));
+
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        toast.error('Session expirée. Veuillez vous reconnecter.');
+        return;
+      }
+
+      const response = await fetch('/api/center-memberships', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ targetUid: selectedEmployee.id })
+      });
+
+      let result = await response.json().catch(() => ({}));
+
+      if (!response.ok && result.code === 'firebase-admin-missing') {
+        result = await removeEmployeeFromCenterLocally(selectedEmployee);
+      } else if (!response.ok) {
+        toast.error(result.error || 'Impossible de supprimer cet employé');
+        return;
+      }
       
       // Mettre à jour la liste des employés
       setEmployees(employees.filter(emp => emp.id !== selectedEmployee.id));
       setFilteredEmployees(filteredEmployees.filter(emp => emp.id !== selectedEmployee.id));
       
-      toast.success(`Le compte de ${selectedEmployee.firstName} ${selectedEmployee.lastName} a été supprimé`);
+      toast.success(
+        result.result === 'account_deleted'
+          ? `Le compte de ${selectedEmployee.firstName} ${selectedEmployee.lastName} a été supprimé`
+          : `${selectedEmployee.firstName} ${selectedEmployee.lastName} a été retiré de ce centre`
+      );
       setShowDeleteModal(false);
       setSelectedEmployee(null);
     } catch (error) {
@@ -173,6 +247,65 @@ const EmployeesPage = () => {
     } finally {
       setDeleteLoading(false);
     }
+  };
+
+  const removeEmployeeFromCenterLocally = async (employee: Employee) => {
+    const normalizedCenterCode = currentCenterCode.trim().toUpperCase();
+    const targetRef = doc(db, 'users', employee.id);
+    const targetSnapshot = await getDoc(targetRef);
+
+    if (!targetSnapshot.exists()) {
+      throw new Error('Compte employé introuvable');
+    }
+
+    const targetData = targetSnapshot.data();
+    const activeCenters = Array.isArray(targetData.activeCenters)
+      ? targetData.activeCenters.filter((code: unknown): code is string => typeof code === 'string' && code.trim() !== '').map((code: string) => code.trim().toUpperCase())
+      : targetData.accountStatus === 'active'
+        ? Array.from(new Set([
+            ...(Array.isArray(targetData.associatedCenters) ? targetData.associatedCenters : []),
+            targetData.centerCode
+          ].filter((code): code is string => typeof code === 'string' && code.trim() !== '').map((code) => code.trim().toUpperCase())))
+        : [];
+    const remainingActiveCenters = activeCenters.filter((centerCode) => centerCode !== normalizedCenterCode);
+    const pendingCenterRequests = Array.isArray(targetData.pendingCenterRequests) ? targetData.pendingCenterRequests : [];
+    const remainingPendingRequests = pendingCenterRequests.filter((pendingRequest: Record<string, unknown>) => {
+      return typeof pendingRequest.centerCode !== 'string' || pendingRequest.centerCode.trim().toUpperCase() !== normalizedCenterCode;
+    });
+    const remainingPendingCodes = remainingPendingRequests
+      .map((pendingRequest: Record<string, unknown>) => typeof pendingRequest.centerCode === 'string' ? pendingRequest.centerCode.trim().toUpperCase() : '')
+      .filter(Boolean);
+
+    if (remainingActiveCenters.length === 0) {
+      // Fallback local seulement: Firestore est supprimé, mais Auth exige Firebase Admin.
+      await deleteDoc(targetRef);
+      return { success: true, result: 'account_deleted' };
+    }
+
+    const centerRoles = targetData.centerRoles && typeof targetData.centerRoles === 'object'
+      ? { ...targetData.centerRoles }
+      : {};
+    delete centerRoles[normalizedCenterCode];
+    const nextRole = Object.values(centerRoles).includes('admin')
+      ? 'admin'
+      : Object.values(centerRoles).includes('employer')
+        ? 'employer'
+        : 'employee';
+
+    await updateDoc(targetRef, {
+      role: nextRole,
+      isEmployer: nextRole === 'admin' || nextRole === 'employer',
+      accountStatus: 'active',
+      centerCode: remainingActiveCenters.includes(targetData.centerCode) ? targetData.centerCode : remainingActiveCenters[0],
+      associatedCenters: remainingActiveCenters,
+      activeCenters: remainingActiveCenters,
+      centerRoles,
+      pendingCenterRequests: remainingPendingRequests,
+      pendingCenterCodes: remainingPendingCodes,
+      updatedAt: serverTimestamp()
+    });
+
+    return { success: true, result: 'center_removed' };
   };
 
   const formatLastOnline = (date?: Date) => {
@@ -414,7 +547,11 @@ const EmployeesPage = () => {
                 >
                   <div className="relative">
                     <div className="absolute top-0 right-0 mt-4 mr-4">
-                      {employee.isEmployer ? (
+                      {employee.role === 'admin' ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            Administrateur
+                          </span>
+                        ) : employee.isEmployer ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                           Employeur
                         </span>
@@ -501,7 +638,7 @@ const EmployeesPage = () => {
               <div className="ga-modal-header px-6 py-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold text-white">
-                    Profil d&apos;{selectedEmployee.isEmployer ? 'employeur' : 'employé'}
+                    Profil d&apos;{selectedEmployee.role === 'admin' ? 'administrateur' : selectedEmployee.isEmployer ? 'employeur' : 'employé'}
                   </h3>
                   <button
                     type="button"
@@ -554,7 +691,7 @@ const EmployeesPage = () => {
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                 selectedEmployee.isEmployer ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
                               }`}>
-                                {selectedEmployee.isEmployer ? 'Employeur' : 'Employé'}
+                                {selectedEmployee.role === 'admin' ? 'Administrateur' : selectedEmployee.isEmployer ? 'Employeur' : 'Employé'}
                               </span>
                             </dd>
                           </div>
@@ -644,11 +781,11 @@ const EmployeesPage = () => {
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
                       Supprimer ce compte
                     </h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500">
-                        Êtes-vous sûr de vouloir supprimer le compte de <span className="font-medium">{selectedEmployee.firstName} {selectedEmployee.lastName}</span> ? Cette action est irréversible et supprimera toutes les données associées à cet utilisateur.
-                      </p>
-                    </div>
+	                  <div className="mt-2">
+	                    <p className="text-sm text-gray-500">
+	                      Êtes-vous sûr de vouloir retirer <span className="font-medium">{selectedEmployee.firstName} {selectedEmployee.lastName}</span> de ce centre ? Si ce compte n’est associé à aucun autre centre actif, il sera supprimé entièrement.
+	                    </p>
+	                  </div>
                   </div>
                 </div>
               </div>

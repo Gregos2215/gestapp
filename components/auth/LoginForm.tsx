@@ -26,6 +26,11 @@ export default function LoginForm() {
       await signIn(email, password);
       router.replace('/dashboard');
     } catch (error) {
+      if (error instanceof Error && error.message === 'PENDING_APPROVAL') {
+        router.replace('/pending-approval');
+        return;
+      }
+
       if (error instanceof Error) {
         toast.error(error.message);
       } else {

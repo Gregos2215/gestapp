@@ -13,7 +13,7 @@ export default function RegisterForm() {
   const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [userType, setUserType] = useState<'employer' | 'employee' | null>(null);
+  const [userType, setUserType] = useState<'employer' | 'employee' | 'admin' | null>(null);
   const [loading, setLoading] = useState(false);
   
   const { signUp } = useAuth() || {};
@@ -48,12 +48,19 @@ export default function RegisterForm() {
         toast.error('Service d\'inscription non disponible');
         return;
       }
-      await signUp(email, password, userType === 'employer', code, firstName, lastName);
+
+      const result = await signUp(email, password, userType, code, firstName, lastName);
       toast.success('Compte créé avec succès !');
+
+      if (result.pendingApproval) {
+        window.location.replace('/pending-approval');
+        return;
+      }
+
       router.push('/dashboard');
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Erreur lors de la création du compte.');
+      toast.error(error instanceof Error ? error.message : 'Erreur lors de la création du compte.');
     } finally {
       setLoading(false);
     }
@@ -92,12 +99,18 @@ export default function RegisterForm() {
             >
               Je suis un employé
             </button>
+            <button
+              onClick={() => setUserType('admin')}
+              className="ga-btn-secondary w-full py-3 px-4 text-sm"
+            >
+              Je suis un administrateur
+            </button>
           </div>
         ) : (
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <div>
               <h3 className="text-lg font-medium text-center mb-4">
-                {userType === 'employer' ? 'Inscription Employeur' : 'Inscription Employé'}
+                {userType === 'employer' ? 'Inscription Employeur' : userType === 'admin' ? 'Inscription Administrateur' : 'Inscription Employé'}
               </h3>
               <button
                 type="button"
