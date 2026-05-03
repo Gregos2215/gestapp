@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
         transaction.set(centerRef, {
           code: centerCode,
           title: `Centre ${centerCode}`,
+          dashboardTitle: `Bienvenue au Centre ${centerCode}`,
           subtitle: 'Informations du centre',
           ownerId: decodedToken.uid,
           createdAt: FieldValue.serverTimestamp(),

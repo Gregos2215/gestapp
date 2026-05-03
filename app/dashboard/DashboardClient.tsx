@@ -231,6 +231,26 @@ function handleExpectedFirestoreActionError(context: string, error: unknown, toa
   }
 }
 
+function formatCenterHeading(title: unknown, centerCode?: string | null): string {
+  const cleanTitle = typeof title === 'string' ? title.trim() : '';
+  const cleanCenterCode = typeof centerCode === 'string' ? centerCode.trim().toUpperCase() : '';
+
+  if (!cleanTitle) return `Bienvenue au Centre ${cleanCenterCode || 'actif'}`;
+  if (/^Bienvenue\b/i.test(cleanTitle)) return cleanTitle;
+  if (cleanCenterCode && cleanTitle.toUpperCase() === cleanCenterCode) {
+    return `Bienvenue au Centre ${cleanCenterCode}`;
+  }
+
+  return `Bienvenue au ${cleanTitle}`;
+}
+
+function getCenterHeading(centerData: Record<string, unknown>, centerCode?: string | null): string {
+  const dashboardTitle = typeof centerData.dashboardTitle === 'string' ? centerData.dashboardTitle.trim() : '';
+  if (dashboardTitle) return dashboardTitle;
+
+  return formatCenterHeading(centerData.title, centerCode);
+}
+
 const getEmployeeNextTasks = (
   tasks: Task[],
   isDateSkippedFn: (task: Task, dateOrTimestamp: Date | number) => boolean
@@ -663,7 +683,7 @@ export default function DashboardClient() {
   const [taskToUncomplete, setTaskToUncomplete] = useState<string | null>(null);
   
   // Ajouter après ces lignes:
-  const [centerTitle, setCenterTitle] = useState<string>("Information du centre");
+  const [centerTitle, setCenterTitle] = useState<string>("Bienvenue au centre");
   const [centerSubtitle, setCenterSubtitle] = useState<string>("Tableau de bord du centre actif");
 
   // États pour la gestion des messages
@@ -767,10 +787,10 @@ export default function DashboardClient() {
               const centerDoc = await getDoc(centerRef);
               if (centerDoc.exists()) {
                 const centerData = centerDoc.data();
-                if (centerData.title) setCenterTitle(centerData.title);
+                setCenterTitle(getCenterHeading(centerData, userData.centerCode));
                 if (centerData.subtitle) setCenterSubtitle(centerData.subtitle);
               } else {
-                setCenterTitle("Centre " + userData.centerCode);
+                setCenterTitle(formatCenterHeading(null, userData.centerCode));
                 setCenterSubtitle("Informations du centre");
               }
             } catch (error) {
@@ -1264,6 +1284,7 @@ export default function DashboardClient() {
       await setDoc(centerRef, {
         code: normalizedCode,
         title,
+        dashboardTitle: formatCenterHeading(title, normalizedCode),
         subtitle: 'Informations du centre',
         ownerId: customUser.uid,
         createdAt: serverTimestamp(),
@@ -2989,10 +3010,10 @@ export default function DashboardClient() {
     const unsubscribe = onSnapshot(centerRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
         const centerData = docSnapshot.data();
-        if (centerData.title) setCenterTitle(centerData.title);
+        setCenterTitle(getCenterHeading(centerData, customUser.centerCode));
         if (centerData.subtitle) setCenterSubtitle(centerData.subtitle);
       } else {
-        setCenterTitle("Centre " + customUser.centerCode);
+        setCenterTitle(formatCenterHeading(null, customUser.centerCode));
         setCenterSubtitle("Informations du centre");
       }
     }, (error) => {
@@ -3281,7 +3302,7 @@ export default function DashboardClient() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xl font-medium text-gray-900">Bonjour, {customUser?.firstName || 'Gestionnaire'} <span aria-hidden="true">👋</span></p>
-            <h1 className="ga-page-title mt-3 text-4xl sm:text-5xl">Bienvenue au {centerTitle || centerCode || 'centre'}</h1>
+            <h1 className="ga-page-title mt-3 text-4xl sm:text-5xl">{centerTitle || formatCenterHeading(null, centerCode)}</h1>
             <p className="mt-4 text-base text-gray-500">{centerSubtitle || 'Tout est sous contrôle. Continuez votre excellente gestion.'}</p>
           </div>
         </div>
@@ -5366,7 +5387,7 @@ export default function DashboardClient() {
                               setIsProfileModified(true);
                             }}
                             className="block w-full px-4 py-3 text-base font-medium text-gray-900 bg-transparent focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:border-transparent"
-                            placeholder="Information du centre"
+                            placeholder="Bienvenue au Centre GKC"
                           />
                           <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                             <svg className="h-5 w-5 text-gray-400 group-hover:text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -5374,7 +5395,7 @@ export default function DashboardClient() {
                             </svg>
                           </div>
                         </div>
-                        <p className="mt-1 text-xs text-gray-500">Ce titre apparaîtra en haut de la section d&apos;information du centre.</p>
+                        <p className="mt-1 text-xs text-gray-500">Cette phrase complète apparaîtra en haut de la page d&apos;accueil.</p>
                       </div>
                       
                       {/* Sous-titre du centre */}
@@ -5429,26 +5450,38 @@ export default function DashboardClient() {
                             // Mise à jour du document du centre si l'utilisateur est un employeur
                             // et que les informations du centre ont été modifiées
                             if (customUser.isEmployer && customUser.centerCode) {
-                              // Ne pas recréer automatiquement un centre supprimé depuis le dashboard.
-                              const centerRef = doc(db, 'centers', customUser.centerCode);
-                              const centerDoc = await getDoc(centerRef);
-                              const nextCenterTitle = centerProfileEdits.title.trim();
+                              const nextCenterTitle = centerProfileEdits.title.trim() || formatCenterHeading(null, customUser.centerCode);
                               const nextCenterSubtitle = centerProfileEdits.subtitle.trim();
-                              
-                              if (centerDoc.exists()) {
-                                // Mise à jour du document du centre existant
-                                await updateDoc(centerRef, {
-                                  title: nextCenterTitle,
-                                  subtitle: nextCenterSubtitle
-                                });
-                                setCenterTitle(nextCenterTitle);
-                                setCenterSubtitle(nextCenterSubtitle);
-                                setCenterProfileEdits({
-                                  title: nextCenterTitle,
-                                  subtitle: nextCenterSubtitle
-                                });
+
+                              const token = await auth.currentUser?.getIdToken();
+                              if (!token) {
+                                throw new Error('Session invalide. Reconnectez-vous pour enregistrer les modifications.');
                               }
-                              console.log('Centre mis à jour avec succès');
+
+                              const response = await fetch('/api/centers/profile', {
+                                method: 'POST',
+                                headers: {
+                                  'Authorization': `Bearer ${token}`,
+                                  'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                  centerCode: customUser.centerCode,
+                                  title: nextCenterTitle,
+                                  subtitle: nextCenterSubtitle
+                                })
+                              });
+
+                              const result = await response.json().catch(() => ({}));
+                              if (!response.ok) {
+                                throw new Error(result.error || 'Erreur lors de la sauvegarde du centre');
+                              }
+
+                              setCenterTitle(result.title || nextCenterTitle);
+                              setCenterSubtitle(result.subtitle || nextCenterSubtitle);
+                              setCenterProfileEdits({
+                                title: result.title || nextCenterTitle,
+                                subtitle: result.subtitle || nextCenterSubtitle
+                              });
                             }
                             
                             // Forcer la mise à jour des données dans l'UI
