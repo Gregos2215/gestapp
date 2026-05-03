@@ -14,7 +14,6 @@ import { auth, db } from '@/lib/firebase';
 import { 
   doc, 
   getDoc, 
-  setDoc, 
   updateDoc, 
   serverTimestamp,
 } from 'firebase/firestore';
@@ -62,6 +61,44 @@ async function checkCenterExists(centerCode: string) {
   }
 
   return Boolean(result.exists);
+}
+
+async function createSignupProfile(token: string, payload: {
+  email: string;
+  role: AccountRole;
+  centerCode: string;
+  firstName: string;
+  lastName: string;
+}) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const response = await fetch('/api/auth/signup-profile', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || 'Erreur lors de la création du compte');
+    }
+
+    return result as { pendingApproval: boolean };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('La création du compte prend trop de temps. Réessayez dans quelques instants.');
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -151,21 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
       try {
-        const centerRef = doc(db, 'centers', normalizedCenterCode);
         const centerRoles = isEmployer ? { [normalizedCenterCode]: 'employer' } : {};
-        if (isEmployer) {
-          await setDoc(centerRef, {
-            code: normalizedCenterCode,
-            title: `Centre ${normalizedCenterCode}`,
-            subtitle: 'Informations du centre',
-            ownerId: userCredential.user.uid,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          }, { merge: true });
-        }
-
-        // Créer le document utilisateur dans Firestore
-        const userProfile = {
+        const localUserProfile = {
           email,
           role,
           accountStatus,
@@ -181,21 +205,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastName,
           isOnline: false,
           lastOnlineAt: null,
-          approvalRequestedAt: accountStatus === 'pending_approval' ? serverTimestamp() : null,
-          approvedAt: accountStatus === 'active' ? serverTimestamp() : null,
+          approvalRequestedAt: accountStatus === 'pending_approval' ? new Date() : null,
+          approvedAt: accountStatus === 'active' ? new Date() : null,
           approvedBy: null,
-          createdAt: serverTimestamp()
+          createdAt: new Date()
         };
 
-        await setDoc(doc(db, 'users', userCredential.user.uid), userProfile);
+        const token = await userCredential.user.getIdToken(true);
+        await createSignupProfile(token, {
+          email,
+          role,
+          centerCode: normalizedCenterCode,
+          firstName,
+          lastName
+        });
 
         if (accountStatus === 'active') {
           setUser({
             ...userCredential.user,
-            ...userProfile,
-            approvalRequestedAt: null,
-            approvedAt: new Date(),
-            createdAt: new Date()
+            ...localUserProfile
           } as User);
           setLoading(false);
         } else {
