@@ -198,6 +198,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             createdAt: new Date()
           } as User);
           setLoading(false);
+        } else {
+          setUser(null);
+          setLoading(false);
         }
       } catch (firestoreError) {
         isSigningUpRef.current = false;
@@ -213,6 +216,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void signOut(auth).catch((signOutError) => {
           console.warn('Unable to sign out pending account immediately:', signOutError);
         });
+
+        if (typeof window !== 'undefined') {
+          window.setTimeout(() => {
+            window.location.replace('/pending-approval');
+          }, 0);
+        }
       }
 
       return { pendingApproval: accountStatus === 'pending_approval' };
