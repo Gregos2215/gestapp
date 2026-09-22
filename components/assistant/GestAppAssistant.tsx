@@ -50,6 +50,16 @@ class AssistantRequestError extends Error {
   }
 }
 
+function fallbackErrorMessage(status: number) {
+  if (status === 400) return 'La demande envoyée à l’assistant est invalide.';
+  if (status === 401) return 'Votre session a expiré. Reconnectez-vous à GestApp.';
+  if (status === 403) return 'Votre compte n’est pas autorisé à utiliser l’assistant dans ce centre.';
+  if (status === 408 || status === 504) return 'La réponse a pris trop de temps. Réessayez avec une question plus courte.';
+  if (status === 429) return 'Trop de demandes ont été envoyées. Attendez quelques instants avant de réessayer.';
+  if (status === 502 || status === 503) return 'Le service Gemini est temporairement indisponible. Réessayez dans quelques instants.';
+  return `Le serveur de l’assistant a rencontré une erreur (${status}).`;
+}
+
 export default function GestAppAssistant({
   isOpen,
   onClose,
@@ -100,21 +110,44 @@ export default function GestAppAssistant({
   }, [isOpen]);
 
   async function callAssistant(payload: Record<string, unknown>) {
-    if (!user || !auth.currentUser) throw new Error('Votre session a expiré.');
-    const token = await auth.currentUser.getIdToken(true);
-    const response = await fetch('/api/assistant', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json().catch(() => ({}));
+    if (!user || !auth.currentUser) throw new AssistantRequestError('Votre session a expiré. Reconnectez-vous à GestApp.', 401);
+    let token: string;
+    try {
+      token = await auth.currentUser.getIdToken(true);
+    } catch {
+      throw new AssistantRequestError('Impossible de vérifier votre session. Vérifiez votre connexion Internet.', 401);
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 45_000);
+    let response: Response;
+    try {
+      response = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new AssistantRequestError('Gemini a dépassé le délai de 45 secondes. Réessayez dans quelques instants.', 504);
+      }
+      throw new AssistantRequestError('Connexion au serveur impossible. Vérifiez Internet ou le déploiement Netlify.', 0);
+    } finally {
+      window.clearTimeout(timeout);
+    }
+
+    const result = await response.json().catch(() => null) as (AssistantApiResponse & { error?: string }) | null;
     if (!response.ok) throw new AssistantRequestError(
-      result.error || 'L’assistant ne répond pas pour le moment.',
+      result?.error || fallbackErrorMessage(response.status),
       response.status,
     );
+    if (!result || typeof result.message !== 'string') {
+      throw new AssistantRequestError('Le serveur a retourné une réponse illisible. Réessayez après avoir actualisé la page.', 502);
+    }
     return result as AssistantApiResponse;
   }
 

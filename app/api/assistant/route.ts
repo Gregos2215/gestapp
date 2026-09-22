@@ -501,7 +501,12 @@ export async function POST(request: NextRequest) {
   try {
     const actor = await authenticate(request);
     await enforceRateLimit(actor);
-    const body = await request.json() as AssistantRequestBody;
+    let body: AssistantRequestBody;
+    try {
+      body = await request.json() as AssistantRequestBody;
+    } catch {
+      throw new AssistantHttpError(400, 'Le format de la demande est invalide.');
+    }
     if (body.actionId || body.decision) return await handleActionDecision(actor, body);
     return await handleConversation(actor, body);
   } catch (error) {
@@ -519,6 +524,12 @@ function handleRouteError(error: unknown) {
   if (error instanceof AssistantHttpError) return json({ error: error.message }, error.status);
   if (error instanceof Error && error.message.includes('Firebase Admin credentials are missing')) {
     return json({ error: 'Configuration Firebase Admin manquante.' }, 503);
+  }
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = String((error as { code?: unknown }).code || '');
+    if (['auth/id-token-expired', 'auth/id-token-revoked', 'auth/argument-error'].includes(code)) {
+      return json({ error: 'Votre session a expiré. Reconnectez-vous à GestApp.' }, 401);
+    }
   }
   console.error('Assistant API error:', error);
   return json({ error: 'L’assistant a rencontré une erreur interne. Réessayez dans un instant.' }, 500);
