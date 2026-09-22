@@ -28,8 +28,17 @@ const MODEL_CHAIN = [
   'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
   'gemini-2.5-flash-lite',
+  'gemini-3.1-flash-lite-preview',
 ] as const;
 const PRIMARY_MODEL = MODEL_CHAIN[0];
+type AssistantModel = (typeof MODEL_CHAIN)[number];
+const MODEL_TIMEOUT_MS: Record<AssistantModel, number> = {
+  'gemini-3.5-flash-lite': 12_000,
+  'gemini-3.1-flash-lite': 35_000,
+  'gemini-2.5-flash-lite': 10_000,
+  'gemini-3.1-flash-lite-preview': 35_000,
+};
+const FALLBACK_STATUS_CODES = new Set([404, 429, 503, 504]);
 const ACTION_TTL_MS = 10 * 60 * 1000;
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 const RATE_LIMIT = 20;
@@ -231,20 +240,27 @@ function apiErrorStatus(error: unknown) {
 type GenerateParametersWithoutModel = Omit<GenerateContentParameters, 'model'>;
 
 async function generateWithFallback(
-  ai: GoogleGenAI,
+  apiKey: string,
   parameters: GenerateParametersWithoutModel,
   startIndex = 0,
 ) {
   for (let modelIndex = startIndex; modelIndex < MODEL_CHAIN.length; modelIndex += 1) {
     const model = MODEL_CHAIN[modelIndex];
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        timeout: MODEL_TIMEOUT_MS[model],
+        retryOptions: { attempts: 1 },
+      },
+    });
     try {
       const response = await ai.models.generateContent({ ...parameters, model });
       return { response, model, modelIndex };
     } catch (error) {
       const status = apiErrorStatus(error);
-      if (status === 503) continue;
-      if (status === 429) {
-        throw new AssistantHttpError(429, 'Gemini reçoit trop de demandes. Réessayez dans quelques instants.');
+      if (status && FALLBACK_STATUS_CODES.has(status)) {
+        console.warn('Assistant Gemini fallback:', { model, status });
+        continue;
       }
       throw error;
     }
@@ -323,13 +339,12 @@ async function handleConversation(actor: AssistantActor, body: AssistantRequestB
     displayName: actor.displayName,
     activeTab,
   });
-  const ai = new GoogleGenAI({ apiKey });
   const contents: Content[] = [{ role: 'user', parts: [{ text: getLatestUserMessage(messages) }] }];
-  let activeModel: (typeof MODEL_CHAIN)[number] = PRIMARY_MODEL;
+  let activeModel: AssistantModel = PRIMARY_MODEL;
   let activeModelIndex = 0;
 
   for (let round = 0; round < 5; round += 1) {
-    const generation = await generateWithFallback(ai, {
+    const generation = await generateWithFallback(apiKey, {
       contents,
       config: {
         systemInstruction,

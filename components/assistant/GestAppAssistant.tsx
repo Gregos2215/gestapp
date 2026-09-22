@@ -48,7 +48,9 @@ const MODEL_LABELS: Record<string, string> = {
   'gemini-3.5-flash-lite': 'Gemini 3.5 Flash-Lite',
   'gemini-2.5-flash-lite': 'Gemini 2.5 Flash-Lite',
   'gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite',
+  'gemini-3.1-flash-lite-preview': 'Gemini 3.1 Flash-Lite Preview',
 };
+const ASSISTANT_TIMEOUT_MS = 90_000;
 
 class AssistantRequestError extends Error {
   constructor(message: string, public status: number) {
@@ -131,7 +133,7 @@ export default function GestAppAssistant({
     }
 
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 45_000);
+    const timeout = window.setTimeout(() => controller.abort(), ASSISTANT_TIMEOUT_MS);
     let response: Response;
     try {
       response = await fetch('/api/assistant', {
@@ -145,7 +147,7 @@ export default function GestAppAssistant({
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new AssistantRequestError('Gemini a dépassé le délai de 45 secondes. Réessayez dans quelques instants.', 504);
+        throw new AssistantRequestError('Gemini a dépassé le délai maximal. Réessayez dans quelques instants.', 504);
       }
       throw new AssistantRequestError('Connexion au serveur impossible. Vérifiez Internet ou le déploiement Netlify.', 0);
     } finally {
