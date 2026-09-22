@@ -34,7 +34,8 @@ import {
   BookmarkIcon as PinIcon,
   MinusCircleIcon,
   TrashIcon,
-  PaperAirplaneIcon
+  PaperAirplaneIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import CreateTaskModal from '@/components/tasks/CreateTaskModal';
 import DatePicker, { registerLocale } from 'react-datepicker';
@@ -46,6 +47,7 @@ import ResidentDetailModal from '@/components/residents/ResidentDetailModal';
 import CreateReportModal from '@/components/reports/CreateReportModal';
 import ReportDetailModal from '@/components/reports/ReportDetailModal';
 import MessageDetailModal from '@/components/messages/MessageDetailModal';
+import GestAppAssistant from '@/components/assistant/GestAppAssistant';
 
 // Enregistrer la locale française pour le DatePicker
 registerLocale('fr', fr);
@@ -624,6 +626,7 @@ export default function DashboardClient() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
   const [isCreateResidentModalOpen, setIsCreateResidentModalOpen] = useState(false);
@@ -5721,6 +5724,21 @@ export default function DashboardClient() {
                   {item.name}
                 </button>
               ))}
+              <div className="border-t border-emerald-900/10 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAssistantOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center px-2 py-2.5 text-base font-bold rounded-full text-emerald-900 transition-all duration-200 hover:bg-emerald-50"
+                >
+                  <span className="mr-4 flex h-12 w-12 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 text-emerald-800">
+                    <SparklesIcon className="h-6 w-6" aria-hidden="true" />
+                  </span>
+                  Assistant
+                </button>
+              </div>
             </nav>
             <div className="p-7">
               <button
@@ -5765,7 +5783,15 @@ export default function DashboardClient() {
                 GestApp
               </span>
             </button>
-            <div className="w-48" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={() => setIsAssistantOpen(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+              title="Ouvrir l’assistant"
+            >
+              <SparklesIcon className="h-5 w-5" aria-hidden="true" />
+              <span className="sr-only">Ouvrir l’assistant</span>
+            </button>
           </div>
         </div>
 
@@ -5781,6 +5807,16 @@ export default function DashboardClient() {
             <Bars3Icon className="h-7 w-7" aria-hidden="true" />
           )}
         </button>
+
+        <GestAppAssistant
+          isOpen={isAssistantOpen}
+          onClose={() => setIsAssistantOpen(false)}
+          activeTab={activeTab}
+          centerTitle={centerTitle}
+          onDataChanged={(entity) => {
+            if (entity === 'resident') void loadResidents();
+          }}
+        />
 
         <CreateTaskModal
           isOpen={isCreateTaskModalOpen}
