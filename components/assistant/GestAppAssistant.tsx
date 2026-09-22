@@ -30,6 +30,7 @@ interface GestAppAssistantProps {
 
 interface DisplayMessage extends AssistantMessageInput {
   id: string;
+  contextContent?: string;
 }
 
 const INITIAL_MESSAGE: DisplayMessage = {
@@ -173,6 +174,7 @@ export default function GestAppAssistant({
       id: crypto.randomUUID(),
       role: 'user',
       content: cleanContent,
+      contextContent: cleanContent,
     };
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
@@ -181,7 +183,10 @@ export default function GestAppAssistant({
 
     try {
       const result = await callAssistant({
-        messages: [{ role: 'user', content: cleanContent }],
+        messages: nextMessages
+          .flatMap((message) => message.contextContent
+            ? [{ role: message.role, content: message.contextContent }]
+            : []),
         pageContext: {
           activeTab,
         },
@@ -190,6 +195,9 @@ export default function GestAppAssistant({
         id: crypto.randomUUID(),
         role: 'assistant',
         content: responseMessage(result),
+        contextContent: result.pendingAction
+          ? `${result.message} ${result.pendingAction.title}. ${result.pendingAction.description}`
+          : result.message,
       }]);
       setPendingAction(result.pendingAction || null);
       setConfigurationState('ready');
@@ -227,6 +235,7 @@ export default function GestAppAssistant({
         id: crypto.randomUUID(),
         role: 'assistant',
         content: result.message,
+        contextContent: result.message,
       }]);
       setPendingAction(null);
       if (result.changedEntity) onDataChanged?.(result.changedEntity);

@@ -42,6 +42,9 @@ const FALLBACK_STATUS_CODES = new Set([404, 429, 503, 504]);
 const ACTION_TTL_MS = 10 * 60 * 1000;
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 const RATE_LIMIT = 20;
+const MAX_HISTORY_MESSAGES = 200;
+const MAX_HISTORY_CHARACTERS = 100_000;
+const MAX_MESSAGE_CHARACTERS = 10_000;
 const ALLOWED_TABS = new Set(['accueil', 'taches', 'residents', 'rapports', 'messages', 'alertes', 'equipe', 'profil']);
 const FUNCTION_DECLARATIONS: FunctionDeclaration[] = ASSISTANT_TOOLS.map((tool) => ({
   name: tool.name,
@@ -211,24 +214,29 @@ function validateMessages(value: unknown): AssistantMessageInput[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new AssistantHttpError(400, 'Le message est vide.');
   }
-  const messages = value.slice(-16).map((message) => {
+  if (value.length > MAX_HISTORY_MESSAGES) {
+    throw new AssistantHttpError(413, 'Cette conversation a atteint sa limite. Effacez-la pour en commencer une nouvelle.');
+  }
+  const messages = value.map((message) => {
     if (!message || typeof message !== 'object') throw new AssistantHttpError(400, 'Historique invalide.');
     const role = (message as { role?: unknown }).role;
     const content = (message as { content?: unknown }).content;
     if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string' || !content.trim()) {
       throw new AssistantHttpError(400, 'Historique invalide.');
     }
-    return { role: role as 'user' | 'assistant', content: content.trim().slice(0, 4000) };
+    if (content.length > MAX_MESSAGE_CHARACTERS) {
+      throw new AssistantHttpError(413, 'Un message de cette conversation est trop long.');
+    }
+    return { role: role as 'user' | 'assistant', content: content.trim() };
   });
   const totalLength = messages.reduce((sum, message) => sum + message.content.length, 0);
-  if (totalLength > 16000) throw new AssistantHttpError(413, 'La conversation est trop longue. Effacez-la puis réessayez.');
+  if (totalLength > MAX_HISTORY_CHARACTERS) {
+    throw new AssistantHttpError(413, 'Cette conversation a atteint sa limite. Effacez-la pour en commencer une nouvelle.');
+  }
+  if (messages[messages.length - 1].role !== 'user') {
+    throw new AssistantHttpError(400, 'Le dernier message doit venir de l’utilisateur.');
+  }
   return messages;
-}
-
-function getLatestUserMessage(messages: AssistantMessageInput[]) {
-  const latest = [...messages].reverse().find((message) => message.role === 'user');
-  if (!latest) throw new AssistantHttpError(400, 'Le message utilisateur est vide.');
-  return latest.content;
 }
 
 function apiErrorStatus(error: unknown) {
@@ -339,7 +347,10 @@ async function handleConversation(actor: AssistantActor, body: AssistantRequestB
     displayName: actor.displayName,
     activeTab,
   });
-  const contents: Content[] = [{ role: 'user', parts: [{ text: getLatestUserMessage(messages) }] }];
+  const contents: Content[] = messages.map((message) => ({
+    role: message.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: message.content }],
+  }));
   let activeModel: AssistantModel = PRIMARY_MODEL;
   let activeModelIndex = 0;
 

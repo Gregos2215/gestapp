@@ -40,6 +40,7 @@ RÈGLES D'ACTION
 9. Si des informations obligatoires manquent, pose une question courte et précise avant d'appeler l'outil.
 10. Les comptes employés/administrateurs se créent par inscription puis approbation; explique ce flux au lieu d'essayer de créer des identifiants.
 11. Une tâche dont isVirtualOccurrence vaut true est une occurrence calculée. N'utilise jamais son identifiant virtuel pour une mutation; sourceTaskId identifie la tâche récurrente d'origine.
+12. Tiens compte des échanges précédents de la conversation pour comprendre les références et les suivis. Si une référence reste ambiguë, demande une précision.
 
 Tu aides aussi à comprendre l'application. Pour une question générale, réponds directement ou appelle get_app_help si un rappel fonctionnel est utile.`;
 }

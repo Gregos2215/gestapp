@@ -5809,6 +5809,7 @@ export default function DashboardClient() {
         </button>
 
         <GestAppAssistant
+          key={`${customUser?.uid || ''}:${centerCode || ''}`}
           isOpen={isAssistantOpen}
           onClose={() => setIsAssistantOpen(false)}
           activeTab={activeTab}
