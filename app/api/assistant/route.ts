@@ -24,7 +24,12 @@ import type { AssistantMessageInput } from '@/lib/assistant/types';
 
 export const runtime = 'nodejs';
 
-const MODEL = 'gemini-3.5-flash-lite';
+const MODEL_CHAIN = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash-lite',
+] as const;
+const PRIMARY_MODEL = MODEL_CHAIN[0];
 const ACTION_TTL_MS = 10 * 60 * 1000;
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 const RATE_LIMIT = 20;
@@ -223,25 +228,31 @@ function apiErrorStatus(error: unknown) {
   return Number.isInteger(status) ? status : null;
 }
 
-async function generateWithRetry(ai: GoogleGenAI, parameters: GenerateContentParameters) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+type GenerateParametersWithoutModel = Omit<GenerateContentParameters, 'model'>;
+
+async function generateWithFallback(
+  ai: GoogleGenAI,
+  parameters: GenerateParametersWithoutModel,
+  startIndex = 0,
+) {
+  for (let modelIndex = startIndex; modelIndex < MODEL_CHAIN.length; modelIndex += 1) {
+    const model = MODEL_CHAIN[modelIndex];
     try {
-      return await ai.models.generateContent(parameters);
+      const response = await ai.models.generateContent({ ...parameters, model });
+      return { response, model, modelIndex };
     } catch (error) {
       const status = apiErrorStatus(error);
-      if ((status !== 429 && status !== 503) || attempt === 2) {
-        if (status === 429) {
-          throw new AssistantHttpError(429, 'Gemini reçoit trop de demandes. Réessayez dans quelques instants.');
-        }
-        if (status === 503) {
-          throw new AssistantHttpError(503, 'Gemini est temporairement très sollicité. Réessayez dans quelques instants.');
-        }
-        throw error;
+      if (status === 503) continue;
+      if (status === 429) {
+        throw new AssistantHttpError(429, 'Gemini reçoit trop de demandes. Réessayez dans quelques instants.');
       }
-      await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+      throw error;
     }
   }
-  throw new AssistantHttpError(503, 'Gemini est temporairement indisponible.');
+  throw new AssistantHttpError(
+    503,
+    'Les modèles Gemini sont temporairement très sollicités. Réessayez dans quelques instants.',
+  );
 }
 
 async function removeExpiredActions(actor: AssistantActor) {
@@ -314,10 +325,11 @@ async function handleConversation(actor: AssistantActor, body: AssistantRequestB
   });
   const ai = new GoogleGenAI({ apiKey });
   const contents: Content[] = [{ role: 'user', parts: [{ text: getLatestUserMessage(messages) }] }];
+  let activeModel: (typeof MODEL_CHAIN)[number] = PRIMARY_MODEL;
+  let activeModelIndex = 0;
 
   for (let round = 0; round < 5; round += 1) {
-    const response = await generateWithRetry(ai, {
-      model: MODEL,
+    const generation = await generateWithFallback(ai, {
       contents,
       config: {
         systemInstruction,
@@ -325,12 +337,19 @@ async function handleConversation(actor: AssistantActor, body: AssistantRequestB
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         maxOutputTokens: 1500,
       },
-    });
+    }, activeModelIndex);
+    const { response } = generation;
+    activeModel = generation.model;
+    activeModelIndex = generation.modelIndex;
     const modelContent = response.candidates?.[0]?.content;
     if (modelContent) contents.push(modelContent);
     const calls = response.functionCalls || [];
     if (calls.length === 0) {
-      return json({ message: response.text?.trim() || 'Je n’ai pas pu produire de réponse utile.' });
+      return json({
+        message: response.text?.trim() || 'Je n’ai pas pu produire de réponse utile.',
+        model: activeModel,
+        fallbackUsed: activeModel !== PRIMARY_MODEL,
+      });
     }
 
     const results: Part[] = [];
@@ -342,6 +361,8 @@ async function handleConversation(actor: AssistantActor, body: AssistantRequestB
           return json({
             message: 'J’ai préparé cette action. Vérifiez les détails avant de la confirmer.',
             pendingAction,
+            model: activeModel,
+            fallbackUsed: activeModel !== PRIMARY_MODEL,
           });
         }
         const result = await executeReadTool(getAdminDb(), actor, call.name, call.args || {});
@@ -366,7 +387,11 @@ async function handleConversation(actor: AssistantActor, body: AssistantRequestB
     contents.push({ role: 'user', parts: results });
   }
 
-  return json({ message: 'La demande nécessite trop d’étapes. Reformulez-la en une seule action précise.' }, 422);
+  return json({
+    message: 'La demande nécessite trop d’étapes. Reformulez-la en une seule action précise.',
+    model: activeModel,
+    fallbackUsed: activeModel !== PRIMARY_MODEL,
+  }, 422);
 }
 
 async function handleActionDecision(actor: AssistantActor, body: AssistantRequestBody) {
@@ -491,7 +516,11 @@ async function handleActionDecision(actor: AssistantActor, body: AssistantReques
 export async function GET(request: NextRequest) {
   try {
     await authenticate(request);
-    return json({ configured: Boolean(process.env.GEMINI_API_KEY), model: MODEL });
+    return json({
+      configured: Boolean(process.env.GEMINI_API_KEY),
+      model: PRIMARY_MODEL,
+      fallbackModels: MODEL_CHAIN.slice(1),
+    });
   } catch (error) {
     return handleRouteError(error);
   }

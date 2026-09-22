@@ -44,6 +44,12 @@ const QUICK_PROMPTS = [
   'Aide-moi à créer une tâche',
 ];
 
+const MODEL_LABELS: Record<string, string> = {
+  'gemini-3.5-flash-lite': 'Gemini 3.5 Flash-Lite',
+  'gemini-2.5-flash-lite': 'Gemini 2.5 Flash-Lite',
+  'gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite',
+};
+
 class AssistantRequestError extends Error {
   constructor(message: string, public status: number) {
     super(message);
@@ -58,6 +64,12 @@ function fallbackErrorMessage(status: number) {
   if (status === 429) return 'Trop de demandes ont été envoyées. Attendez quelques instants avant de réessayer.';
   if (status === 502 || status === 503) return 'Le service Gemini est temporairement indisponible. Réessayez dans quelques instants.';
   return `Le serveur de l’assistant a rencontré une erreur (${status}).`;
+}
+
+function responseMessage(result: AssistantApiResponse) {
+  if (!result.fallbackUsed || !result.model) return result.message;
+  const modelLabel = MODEL_LABELS[result.model] || result.model;
+  return `${result.message}\n\nModèle de secours utilisé : ${modelLabel}.`;
 }
 
 export default function GestAppAssistant({
@@ -175,7 +187,7 @@ export default function GestAppAssistant({
       setMessages((current) => [...current, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: result.message,
+        content: responseMessage(result),
       }]);
       setPendingAction(result.pendingAction || null);
       setConfigurationState('ready');

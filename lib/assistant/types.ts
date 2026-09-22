@@ -19,4 +19,6 @@ export interface AssistantApiResponse {
   message: string;
   pendingAction?: AssistantPendingAction;
   changedEntity?: AssistantChangedEntity;
+  model?: string;
+  fallbackUsed?: boolean;
 }
